@@ -4,7 +4,8 @@
  * This migration adds anonymous session-based authentication:
  * - Creates sessions table with UUID primary key
  * - Links save_slots to sessions
- * - Clears existing data for clean slate
+ * - Clears user-specific data (save_slots, progress, temple_progress)
+ * - PRESERVES shared game data (categories, items, temple_requirements)
  *
  * Run with: bun run packages/backend/src/db/migrations/005_add_sessions.ts
  */
@@ -46,8 +47,8 @@ async function migrate() {
       )
     `;
 
-    // Clear existing data (foreign key order matters)
-    console.log("Clearing existing data for clean slate...");
+    // Clear user-specific data only (preserve game data)
+    console.log("Clearing user-specific data (preserving game data)...");
     
     // Check if temple_progress exists before trying to delete
     const templeProgressExists = await sql`
@@ -59,14 +60,20 @@ async function migrate() {
     
     if (templeProgressExists[0]?.exists) {
       await sql`DELETE FROM temple_progress`;
-      console.log("  - Cleared temple_progress");
+      console.log("  - Cleared temple_progress (user data)");
     }
     
     await sql`DELETE FROM progress`;
-    console.log("  - Cleared progress");
+    console.log("  - Cleared progress (user data)");
     
     await sql`DELETE FROM save_slots`;
-    console.log("  - Cleared save_slots");
+    console.log("  - Cleared save_slots (user data)");
+
+    // Note: We DO NOT delete these shared game data tables:
+    // - categories (game data)
+    // - items (scraped wiki data)
+    // - temple_requirements (game data)
+    console.log("  - Preserved categories, items, temple_requirements (shared game data)");
 
     // Add session_id column to save_slots
     console.log("Adding session_id column to save_slots...");
@@ -107,6 +114,14 @@ async function migrate() {
     if (columns.length > 0) {
       console.log(`  - save_slots.session_id column added (${columns[0]?.data_type})`);
     }
+
+    // Show preserved data counts
+    const itemCount = await sql`SELECT COUNT(*)::int as count FROM items`;
+    const categoryCount = await sql`SELECT COUNT(*)::int as count FROM categories`;
+    
+    console.log("\nPreserved game data:");
+    console.log(`  - ${categoryCount[0]?.count || 0} categories`);
+    console.log(`  - ${itemCount[0]?.count || 0} items`);
 
     console.log("\nMigration completed successfully!");
     console.log("\nNext steps:");
