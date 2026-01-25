@@ -1,14 +1,19 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { serveStatic } from "hono/bun";
 import { checkConnection } from "./db";
 import categoriesRouter from "./routes/categories";
 import itemsRouter from "./routes/items";
 import savesRouter from "./routes/saves";
 import progressRouter from "./routes/progress";
 import templeRouter from "./routes/temple";
+import path from "path";
 
 const app = new Hono();
+
+// Path to frontend build directory
+const frontendDist = path.join(import.meta.dir, "../../frontend/dist");
 
 // Middleware
 app.use("*", logger());
@@ -47,9 +52,22 @@ app.route("/api/saves", savesRouter);
 app.route("/api/progress", progressRouter);
 app.route("/api/temple", templeRouter);
 
-// 404 handler
-app.notFound((c) => {
-  return c.json({ error: "not_found", message: "Endpoint not found", success: false }, 404);
+// Serve frontend static files
+app.use("/*", serveStatic({ root: frontendDist }));
+
+// SPA fallback - serve index.html for client-side routing
+app.get("*", async (c) => {
+  // If it's an API route that wasn't matched, return 404
+  if (c.req.path.startsWith("/api/")) {
+    return c.json({ error: "not_found", message: "Endpoint not found", success: false }, 404);
+  }
+  // Otherwise serve index.html for SPA routing
+  const indexPath = path.join(frontendDist, "index.html");
+  const file = Bun.file(indexPath);
+  if (await file.exists()) {
+    return c.html(await file.text());
+  }
+  return c.json({ error: "not_found", message: "Frontend not built", success: false }, 404);
 });
 
 // Error handler
@@ -64,22 +82,10 @@ app.onError((err, c) => {
 const port = Number(process.env.PORT) || 3001;
 
 console.log(`
-  Coral Island Tracker API
-  ========================
+  Coral Island Tracker
+  ====================
   Server running at http://localhost:${port}
-  
-  Endpoints:
-    GET  /health                    - Health check
-    GET  /api/categories            - List categories
-    GET  /api/items                 - List items (with filters)
-    GET  /api/saves                 - List save slots
-    POST /api/saves                 - Create save slot
-    GET  /api/progress/:id          - Get progress for save slot
-    PUT  /api/progress/:s/:i        - Update item progress
-    GET  /api/temple/altars         - Temple overview with altars
-    GET  /api/temple/altars/:slug   - Altar detail with offerings
-    PUT  /api/temple/progress/:id   - Update temple item offered status
-    GET  /api/temple/item/:itemId   - Check if item is temple requirement
+  Frontend served from: ${frontendDist}
 `);
 
 export default {
