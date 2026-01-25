@@ -8,8 +8,6 @@
     "dev:backend": "bun run --filter backend dev",
     "dev:frontend": "bun run --filter frontend dev",
     "build": "bun run --filter '*' build",
-    "build:prod": "bun run --filter frontend build && mkdir -p packages/backend/public && cp -r packages/frontend/dist/* packages/backend/public/",
-    "start": "NODE_ENV=production bun run packages/backend/src/db/setup.ts && bun run packages/backend/src/index.ts",
     "db:setup": "bun run packages/backend/src/db/setup.ts",
     "db:seed": "bun run packages/backend/src/db/seed.ts",
     "db:migrate": "bun run packages/backend/src/db/migrations/001_add_forageables.ts",

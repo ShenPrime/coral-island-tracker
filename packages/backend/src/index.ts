@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { serveStatic } from "hono/bun";
 import { checkConnection } from "./db";
 import categoriesRouter from "./routes/categories";
 import itemsRouter from "./routes/items";
@@ -14,21 +13,16 @@ const app = new Hono();
 // Middleware
 app.use("*", logger());
 
-// CORS - allow all origins in production (frontend served from same origin)
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(",") 
-  : ["http://localhost:5173", "http://localhost:3000"];
+// CORS - allow origins from env var, or allow all if not set
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["*"];
 
 app.use(
   "*",
   cors({
     origin: (origin) => {
-      // Allow requests with no origin (same-origin, server-side, etc.)
       if (!origin) return null;
-      // Check if origin is in allowed list
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
-        return origin;
-      }
+      if (allowedOrigins.includes("*")) return origin;
+      if (allowedOrigins.includes(origin)) return origin;
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -53,22 +47,8 @@ app.route("/api/saves", savesRouter);
 app.route("/api/progress", progressRouter);
 app.route("/api/temple", templeRouter);
 
-// Serve static frontend files in production
-if (process.env.NODE_ENV === "production") {
-  // Serve static assets
-  app.use("/*", serveStatic({ root: "./public" }));
-  
-  // SPA fallback - serve index.html for non-API routes
-  app.get("*", serveStatic({ path: "./public/index.html" }));
-}
-
-// 404 handler for API routes
+// 404 handler
 app.notFound((c) => {
-  // If it's an API request, return JSON error
-  if (c.req.path.startsWith("/api")) {
-    return c.json({ error: "not_found", message: "Endpoint not found", success: false }, 404);
-  }
-  // For non-API routes in production, this shouldn't be reached due to SPA fallback
   return c.json({ error: "not_found", message: "Endpoint not found", success: false }, 404);
 });
 
