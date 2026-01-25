@@ -1,0 +1,19 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:setup": "bun run src/db/setup.ts",
+    "db:seed": "bun run src/db/seed.ts"
+  },
+  "dependencies": {
+    "@coral-tracker/shared": "workspace:*",
+    "hono": "^4.0.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

@@ -1,0 +1,1116 @@
+/**
+ * Wiki Scraper for Coral Island
+ *
+ * Scrapes data from the Coral Island Fandom wiki using the MediaWiki API.
+ * Fetches individual item pages for accurate data extraction.
+ *
+ * Usage:
+ *   bun run scrape              # Scrape all categories
+ *   bun run scrape fish         # Scrape specific category
+ *   bun run scrape --clear      # Clear existing data before scraping
+ *   bun run scrape --fast       # Skip individual page fetching (less data)
+ *
+ * Note: Please be respectful to the wiki servers.
+ */
+
+import postgres from "postgres";
+
+const connectionString =
+  process.env.DATABASE_URL || "postgres://postgres@localhost:5432/coral_tracker";
+const sql = postgres(connectionString);
+
+const WIKI_BASE = "https://coralisland.fandom.com";
+const API_URL = `${WIKI_BASE}/api.php`;
+
+// Rate limiting - be respectful to wiki servers
+const DELAY_MS = 300;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ============ Types ============
+
+interface ScrapedItem {
+  name: string;
+  rarity?: string;
+  seasons?: string[];
+  time_of_day?: string[];
+  weather?: string[];
+  locations?: string[];
+  base_price?: number;
+  image_url?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface CategoryMember {
+  title: string;
+  ns: number;
+  pageid: number;
+}
+
+// ============ Utility Functions ============
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#\d+;/g, "")
+    .replace(/\u2022/g, ",") // bullet point to comma
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ============ Parsing Helpers ============
+
+function parseSeasons(text: string): string[] {
+  const seasons: string[] = [];
+  const lower = text.toLowerCase();
+
+  if (lower.includes("spring") || lower.includes("spr")) seasons.push("spring");
+  if (lower.includes("summer") || lower.includes("sum")) seasons.push("summer");
+  if (lower.includes("fall") || lower.includes("fal") || lower.includes("autumn")) seasons.push("fall");
+  if (lower.includes("winter") || lower.includes("win")) seasons.push("winter");
+
+  return seasons;
+}
+
+function parseTimeOfDay(text: string): string[] {
+  const times: string[] = [];
+  const lower = text.toLowerCase();
+
+  if (lower.includes("all day") || lower.includes("any time") || lower.includes("anytime")) {
+    return ["morning", "afternoon", "evening", "night"];
+  }
+
+  if (lower.includes("morning")) times.push("morning");
+  if (lower.includes("afternoon")) times.push("afternoon");
+  if (lower.includes("evening")) times.push("evening");
+  if (lower.includes("night")) times.push("night");
+
+  // Handle "Day" as morning+afternoon+evening
+  if (times.length === 0 && lower.includes("day") && !lower.includes("night")) {
+    return ["morning", "afternoon", "evening"];
+  }
+
+  return times;
+}
+
+function parseWeather(text: string): string[] {
+  const weather: string[] = [];
+  const lower = text.toLowerCase();
+
+  if (lower.includes("any") || lower.includes("all")) {
+    return []; // Empty = any weather
+  }
+
+  if (lower.includes("sunny") || lower.includes("clear")) weather.push("sunny");
+  if (lower.includes("windy") || lower.includes("wind")) weather.push("windy");
+  if (lower.includes("rain") && !lower.includes("storm")) weather.push("rain");
+  if (lower.includes("storm") || lower.includes("thunder")) weather.push("storm");
+  if (lower.includes("snow")) weather.push("snow");
+  if (lower.includes("blizzard")) weather.push("blizzard");
+
+  return weather;
+}
+
+function parseRarity(text: string): string {
+  const lower = text.toLowerCase();
+  if (lower.includes("legendary")) return "legendary";
+  if (lower.includes("super rare")) return "super_rare";
+  if (lower.includes("rare")) return "rare";
+  if (lower.includes("uncommon")) return "uncommon";
+  return "common";
+}
+
+function parsePrice(text: string): number | undefined {
+  const cleaned = text.replace(/,/g, "").replace(/\s/g, "");
+  // Look for "Base: X" pattern or just a number
+  const baseMatch = cleaned.match(/[Bb]ase:?\s*(\d+)/);
+  if (baseMatch) return parseInt(baseMatch[1]!, 10);
+  
+  const numMatch = cleaned.match(/^(\d+)/);
+  return numMatch ? parseInt(numMatch[1]!, 10) : undefined;
+}
+
+function parseLocations(text: string): string[] {
+  // Split by bullet points, commas, or line breaks
+  return text
+    .split(/[,\u2022\n\r]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.length < 100 && !s.match(/^\d+$/));
+}
+
+// ============ API Functions ============
+
+/**
+ * Fetch members of a wiki category
+ */
+async function fetchCategoryMembers(category: string): Promise<Set<string>> {
+  const members = new Set<string>();
+  
+  const params = new URLSearchParams({
+    action: "query",
+    list: "categorymembers",
+    cmtitle: category,
+    cmlimit: "500",
+    format: "json",
+  });
+
+  await delay(DELAY_MS);
+  const response = await fetch(`${API_URL}?${params}`);
+  
+  if (!response.ok) {
+    console.error(`    Failed to fetch ${category}: ${response.status}`);
+    return members;
+  }
+
+  const data = (await response.json()) as {
+    query?: { categorymembers?: CategoryMember[] };
+  };
+
+  for (const member of data.query?.categorymembers || []) {
+    if (member.ns === 0) { // Only include main namespace pages
+      members.add(member.title);
+    }
+  }
+
+  return members;
+}
+
+/**
+ * Fetch a wiki page's HTML content
+ */
+async function fetchPageHtml(title: string): Promise<string | null> {
+  const params = new URLSearchParams({
+    action: "parse",
+    page: title,
+    format: "json",
+    prop: "text",
+  });
+
+  await delay(DELAY_MS);
+  
+  try {
+    const response = await fetch(`${API_URL}?${params}`);
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as { 
+      parse?: { text?: { "*"?: string } };
+      error?: { code: string };
+    };
+    
+    if (data.error) return null;
+    return data.parse?.text?.["*"] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch item details from individual wiki page with retry
+ */
+async function fetchItemDetails(
+  itemName: string,
+  retries = 1
+): Promise<Partial<ScrapedItem> | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const html = await fetchPageHtml(itemName);
+    if (html) {
+      return parseInfobox(html);
+    }
+    if (attempt < retries) {
+      await delay(1000); // Wait longer before retry
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse price tables from infobox
+ * Returns { prices: {base, bronze, silver, gold, osmium}, prices_with_perk: {...} }
+ */
+function parsePriceTables(html: string): { 
+  prices?: Record<string, number>; 
+  prices_with_perk?: Record<string, number>;
+  base_price?: number;
+} {
+  const result: { 
+    prices?: Record<string, number>; 
+    prices_with_perk?: Record<string, number>;
+    base_price?: number;
+  } = {};
+
+  // Find all price tables (horizontal groups with "Sell price" in caption)
+  const tableRegex = /<table[^>]*class="[^"]*pi-horizontal-group[^"]*"[^>]*>[\s\S]*?<caption[^>]*>([\s\S]*?)<\/caption>[\s\S]*?<\/table>/gi;
+  let tableMatch;
+  let tableIndex = 0;
+
+  while ((tableMatch = tableRegex.exec(html)) !== null) {
+    const caption = stripHtml(tableMatch[1]).toLowerCase();
+    const tableHtml = tableMatch[0];
+
+    // Check if this is a price table
+    if (!caption.includes("sell price") && !caption.includes("prices")) {
+      continue;
+    }
+
+    const prices: Record<string, number> = {};
+    
+    // Extract prices from table cells
+    const priceFields = ["sell", "base", "bronze", "silver", "gold", "osmium"];
+    for (const field of priceFields) {
+      const cellRegex = new RegExp(
+        `data-source="${field}"[^>]*>[\\s\\S]*?<td[^>]*>([\\s\\S]*?)</td>`,
+        "i"
+      );
+      const cellMatch = tableHtml.match(cellRegex);
+      if (cellMatch?.[1]) {
+        const value = parseInt(stripHtml(cellMatch[1]).replace(/,/g, ""), 10);
+        if (!isNaN(value) && value > 0) {
+          // Map "sell" to "base" for consistency
+          const key = field === "sell" ? "base" : field;
+          prices[key] = value;
+        }
+      }
+    }
+
+    if (Object.keys(prices).length > 0) {
+      // Check if this is the Fish Price perk table
+      if (caption.includes("fish price") || caption.includes("perk")) {
+        result.prices_with_perk = prices;
+      } else if (!result.prices) {
+        // First price table is normal prices
+        result.prices = prices;
+        result.base_price = prices.base;
+      }
+    }
+    
+    tableIndex++;
+  }
+
+  return result;
+}
+
+/**
+ * Parse seasons from text format (e.g., "Fall • Winter" or "Spring, Summer")
+ */
+function parseSeasonsFromText(text: string): string[] {
+  const seasons: string[] = [];
+  const lower = text.toLowerCase();
+
+  // Check for each season
+  if (lower.includes("spring") || lower.match(/\bspr\b/)) seasons.push("spring");
+  if (lower.includes("summer") || lower.match(/\bsum\b/)) seasons.push("summer");
+  if (lower.includes("fall") || lower.includes("autumn") || lower.match(/\bfal\b/)) seasons.push("fall");
+  if (lower.includes("winter") || lower.match(/\bwin\b/)) seasons.push("winter");
+
+  // Check for "all seasons" or "any season"
+  if (lower.includes("all season") || lower.includes("any season")) {
+    return ["spring", "summer", "fall", "winter"];
+  }
+
+  return seasons;
+}
+
+/**
+ * Parse the portable-infobox from a wiki page
+ * Extracts comprehensive data including prices, seasons, and metadata
+ */
+function parseInfobox(html: string): Partial<ScrapedItem> {
+  const item: Partial<ScrapedItem> = {};
+  const metadata: Record<string, unknown> = {};
+
+  // ============ IMAGE ============
+  // Extract image URL from infobox figure
+  const figureMatch = html.match(
+    /<figure[^>]*class="[^"]*pi-image[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[\s\S]*?<\/figure>/i
+  );
+  if (figureMatch?.[1]) {
+    item.image_url = figureMatch[1];
+  } else {
+    // Fallback: look for data-src in img tags within infobox
+    const imgMatch = html.match(
+      /portable-infobox[\s\S]*?data-src="(https:\/\/static\.wikia\.nocookie\.net[^"]+)"/i
+    );
+    if (imgMatch?.[1]) {
+      item.image_url = imgMatch[1];
+    }
+  }
+
+  // ============ DESCRIPTION ============
+  const captionMatch = html.match(/<figcaption[^>]*class="[^"]*pi-caption[^"]*"[^>]*>([\s\S]*?)<\/figcaption>/i);
+  if (captionMatch?.[1]) {
+    item.description = stripHtml(captionMatch[1]);
+  }
+
+  // ============ HELPER: Extract data-source values ============
+  const extractDataValue = (source: string): string | null => {
+    const regex = new RegExp(
+      `data-source="${source}"[^>]*>[\\s\\S]*?<div[^>]*class="[^"]*pi-data-value[^"]*"[^>]*>([\\s\\S]*?)</div>`,
+      "i"
+    );
+    const match = html.match(regex);
+    return match ? stripHtml(match[1]) : null;
+  };
+
+  // ============ COMMON FIELDS ============
+  
+  // Location
+  const location = extractDataValue("location");
+  if (location) {
+    item.locations = parseLocations(location);
+  }
+
+  // Weather
+  const weather = extractDataValue("weather");
+  if (weather) {
+    item.weather = parseWeather(weather);
+  }
+
+  // Time of day
+  const time = extractDataValue("time");
+  if (time) {
+    item.time_of_day = parseTimeOfDay(time);
+  }
+
+  // Rarity
+  const rarity = extractDataValue("rarity");
+  if (rarity) {
+    item.rarity = parseRarity(rarity);
+  }
+
+  // Type (store in metadata)
+  const itemType = extractDataValue("type");
+  if (itemType) {
+    metadata.type = itemType;
+  }
+
+  // ============ PRICE TABLES ============
+  const priceData = parsePriceTables(html);
+  if (priceData.base_price) {
+    item.base_price = priceData.base_price;
+  }
+  if (priceData.prices && Object.keys(priceData.prices).length > 0) {
+    metadata.prices = priceData.prices;
+  }
+  if (priceData.prices_with_perk && Object.keys(priceData.prices_with_perk).length > 0) {
+    metadata.prices_with_perk = priceData.prices_with_perk;
+  }
+
+  // Fallback: try simple price extraction if no table found
+  if (!item.base_price) {
+    const price = extractDataValue("price") || extractDataValue("sell") || extractDataValue("base");
+    if (price) {
+      item.base_price = parsePrice(price);
+    }
+  }
+
+  // ============ SEASONS (Two formats) ============
+  
+  // Format 1: Table with checkmarks (fish use this)
+  const seasons: string[] = [];
+  const seasonTableMatch = html.match(
+    /<table[^>]*class="[^"]*pi-horizontal-group[^"]*"[^>]*>[\s\S]*?<caption[^>]*>Season<\/caption>[\s\S]*?<\/table>/i
+  );
+  
+  if (seasonTableMatch) {
+    const tableHtml = seasonTableMatch[0];
+    
+    const checkSeason = (season: string): void => {
+      // Match <td ... data-source="season" ...>content</td>
+      const cellRegex = new RegExp(
+        `<td[^>]*data-source="${season}"[^>]*>([\\s\\S]*?)</td>`,
+        "i"
+      );
+      const cellMatch = tableHtml.match(cellRegex);
+      if (cellMatch?.[1]) {
+        const content = cellMatch[1];
+        // Check for checkmark (✓ or \u2713) or image (checkmark image) or non-empty non-dash content
+        if (content.includes("✓") || content.includes("\u2713") || 
+            content.includes("<img") ||
+            (stripHtml(content).trim().length > 0 && !stripHtml(content).includes("—"))) {
+          seasons.push(season);
+        }
+      }
+    };
+
+    checkSeason("spring");
+    checkSeason("summer");
+    checkSeason("fall");
+    checkSeason("winter");
+  }
+
+  // Format 2: Text field (insects/critters/crops use this)
+  if (seasons.length === 0) {
+    const seasonText = extractDataValue("season");
+    if (seasonText) {
+      const parsedSeasons = parseSeasonsFromText(seasonText);
+      seasons.push(...parsedSeasons);
+    }
+  }
+
+  if (seasons.length > 0) {
+    item.seasons = seasons;
+  }
+
+  // ============ FISH-SPECIFIC FIELDS ============
+  
+  // Difficulty (Easy, Medium, Hard)
+  const difficulty = extractDataValue("difficulty");
+  if (difficulty) {
+    metadata.difficulty = difficulty;
+  }
+
+  // Size (Small, Medium, Large)
+  const size = extractDataValue("size");
+  if (size) {
+    metadata.size = size;
+  }
+
+  // Pattern (Straight, Sinker, Dart, Mixed, Floater)
+  const pattern = extractDataValue("pattern");
+  if (pattern) {
+    metadata.pattern = pattern;
+  }
+
+  // ============ CROP-SPECIFIC FIELDS ============
+
+  // Seed info (extract name and price)
+  const seed = extractDataValue("seed");
+  if (seed) {
+    const seedInfo: { name?: string; price?: number } = {};
+    seedInfo.name = seed.replace(/\d+\s*[Gg]?$/g, "").trim(); // Remove trailing price
+    const seedPriceMatch = seed.match(/(\d+)\s*[Gg]?$/);
+    if (seedPriceMatch) {
+      seedInfo.price = parseInt(seedPriceMatch[1], 10);
+    }
+    if (seedInfo.name) {
+      metadata.seed = seedInfo;
+    }
+  }
+
+  // Growth time
+  const growthTime = extractDataValue("growth") || extractDataValue("grow");
+  if (growthTime) {
+    const daysMatch = growthTime.match(/(\d+)\s*days?/i);
+    if (daysMatch) {
+      metadata.growth_days = parseInt(daysMatch[1], 10);
+    }
+    // Check for regrowth
+    const regrowthMatch = growthTime.match(/regrow[^\d]*(\d+)/i);
+    if (regrowthMatch) {
+      metadata.regrowth_days = parseInt(regrowthMatch[1], 10);
+    }
+  }
+
+  // Regrowth (sometimes separate field)
+  const regrowth = extractDataValue("regrowth") || extractDataValue("regrow");
+  if (regrowth && !metadata.regrowth_days) {
+    const daysMatch = regrowth.match(/(\d+)/);
+    if (daysMatch) {
+      metadata.regrowth_days = parseInt(daysMatch[1], 10);
+    }
+  }
+
+  // Unlock requirement
+  const unlock = extractDataValue("unlock") || extractDataValue("unlocked");
+  if (unlock) {
+    metadata.unlock_requirement = unlock;
+  }
+
+  // ============ STORE METADATA ============
+  if (Object.keys(metadata).length > 0) {
+    item.metadata = metadata;
+  }
+
+  return item;
+}
+
+// ============ Progress Display ============
+
+function showProgress(current: number, total: number, itemName: string): void {
+  const pct = Math.round((current / total) * 100);
+  const bar = "█".repeat(Math.floor(pct / 5)) + "░".repeat(20 - Math.floor(pct / 5));
+  process.stdout.write(`\r  [${bar}] ${current}/${total} (${pct}%) - ${itemName.substring(0, 30).padEnd(30)}`);
+}
+
+function clearProgress(): void {
+  process.stdout.write("\r" + " ".repeat(80) + "\r");
+}
+
+// ============ Category Scrapers ============
+
+/**
+ * Scrape fish - fetch individual pages for accurate season/time/weather data
+ */
+async function scrapeFish(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const skipItems = new Set(["Fish", "Fish/beta"]);
+
+  console.log("  Fetching fish list from Category:Fish...");
+  const fishNames = await fetchCategoryMembers("Category:Fish");
+  
+  // Filter out non-fish pages
+  const validFish = [...fishNames].filter(name => !skipItems.has(name));
+  console.log(`  Found ${validFish.length} fish`);
+
+  if (fastMode) {
+    // Fast mode: just return names with no details
+    for (const name of validFish) {
+      items.push({ name, seasons: [], time_of_day: [], weather: [] });
+    }
+    return items;
+  }
+
+  // Fetch individual pages for details
+  console.log("  Fetching individual fish pages...");
+  
+  for (let i = 0; i < validFish.length; i++) {
+    const name = validFish[i]!;
+    showProgress(i + 1, validFish.length, name);
+
+    const details = await fetchItemDetails(name);
+    
+    const item: ScrapedItem = {
+      name,
+      seasons: details?.seasons || [],
+      time_of_day: details?.time_of_day || [],
+      weather: details?.weather || [],
+      locations: details?.locations || [],
+      rarity: details?.rarity || "common",
+      base_price: details?.base_price,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata: details?.metadata || {},
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
+/**
+ * Scrape insects - use category cross-referencing for seasons/time + individual pages
+ */
+async function scrapeInsects(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const skipItems = new Set(["Insect", "Bug catching"]);
+
+  console.log("  Fetching insect list from Category:Insects...");
+  const insectNames = await fetchCategoryMembers("Category:Insects");
+  
+  const validInsects = [...insectNames].filter(name => !skipItems.has(name));
+  console.log(`  Found ${validInsects.length} insects`);
+
+  // Fetch season categories
+  console.log("  Fetching season categories...");
+  const springInsects = await fetchCategoryMembers("Category:Spring_insects");
+  const summerInsects = await fetchCategoryMembers("Category:Summer_insects");
+  const fallInsects = await fetchCategoryMembers("Category:Fall_insects");
+  const winterInsects = await fetchCategoryMembers("Category:Winter_insects");
+
+  // Fetch time categories
+  console.log("  Fetching time categories...");
+  const dayInsects = await fetchCategoryMembers("Category:Day_insects");
+  const nightInsects = await fetchCategoryMembers("Category:Night_insects");
+
+  if (fastMode) {
+    // Fast mode: use category data only
+    for (const name of validInsects) {
+      const seasons: string[] = [];
+      if (springInsects.has(name)) seasons.push("spring");
+      if (summerInsects.has(name)) seasons.push("summer");
+      if (fallInsects.has(name)) seasons.push("fall");
+      if (winterInsects.has(name)) seasons.push("winter");
+
+      const timeOfDay: string[] = [];
+      if (dayInsects.has(name)) timeOfDay.push("morning", "afternoon", "evening");
+      if (nightInsects.has(name)) timeOfDay.push("night");
+
+      items.push({
+        name,
+        seasons: seasons.length > 0 ? seasons : [], // Empty = any
+        time_of_day: timeOfDay.length > 0 ? [...new Set(timeOfDay)] : [], // Empty = any
+        weather: [],
+      });
+    }
+    return items;
+  }
+
+  // Full mode: fetch individual pages too
+  console.log("  Fetching individual insect pages...");
+  
+  for (let i = 0; i < validInsects.length; i++) {
+    const name = validInsects[i]!;
+    showProgress(i + 1, validInsects.length, name);
+
+    // Get seasons from categories (as fallback)
+    const categorySeasons: string[] = [];
+    if (springInsects.has(name)) categorySeasons.push("spring");
+    if (summerInsects.has(name)) categorySeasons.push("summer");
+    if (fallInsects.has(name)) categorySeasons.push("fall");
+    if (winterInsects.has(name)) categorySeasons.push("winter");
+
+    // Get time from categories (as fallback)
+    const categoryTime: string[] = [];
+    if (dayInsects.has(name)) categoryTime.push("morning", "afternoon", "evening");
+    if (nightInsects.has(name)) categoryTime.push("night");
+
+    // Fetch individual page for full details
+    const details = await fetchItemDetails(name);
+
+    // Prefer infobox data over category data when available
+    const seasons = details?.seasons && details.seasons.length > 0 
+      ? details.seasons 
+      : categorySeasons;
+    
+    const timeOfDay = details?.time_of_day && details.time_of_day.length > 0
+      ? details.time_of_day
+      : categoryTime.length > 0 ? [...new Set(categoryTime)] : [];
+
+    const item: ScrapedItem = {
+      name,
+      seasons: seasons.length > 0 ? seasons : [], // Empty = any season
+      time_of_day: timeOfDay.length > 0 ? timeOfDay : [], // Empty = any time
+      weather: details?.weather || [],
+      locations: details?.locations || [],
+      rarity: details?.rarity || "common",
+      base_price: details?.base_price,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata: details?.metadata || {},
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
+/**
+ * Scrape critters - underwater creatures, always available (no season/time filtering)
+ */
+async function scrapeCritters(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const skipItems = new Set(["Critter"]);
+
+  console.log("  Fetching critter list from Category:Critters...");
+  const critterNames = await fetchCategoryMembers("Category:Critters");
+  
+  const validCritters = [...critterNames].filter(name => !skipItems.has(name));
+  console.log(`  Found ${validCritters.length} critters`);
+
+  if (fastMode) {
+    for (const name of validCritters) {
+      items.push({
+        name,
+        seasons: [], // Empty = any (always available underwater)
+        time_of_day: [], // Empty = any
+        weather: [],
+        locations: ["Ocean", "Diving"],
+      });
+    }
+    return items;
+  }
+
+  // Fetch individual pages
+  console.log("  Fetching individual critter pages...");
+  
+  for (let i = 0; i < validCritters.length; i++) {
+    const name = validCritters[i]!;
+    showProgress(i + 1, validCritters.length, name);
+
+    const details = await fetchItemDetails(name);
+
+    const item: ScrapedItem = {
+      name,
+      // Use parsed seasons from infobox, empty array means "any season"
+      seasons: details?.seasons || [],
+      time_of_day: details?.time_of_day || [],
+      weather: details?.weather || [],
+      locations: details?.locations || ["Ocean", "Diving"],
+      rarity: details?.rarity || "common",
+      base_price: details?.base_price,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata: details?.metadata || {},
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
+/**
+ * Scrape crops - use season categories + individual pages for images/prices
+ */
+async function scrapeCrops(fastMode: boolean): Promise<ScrapedItem[]> {
+  const itemsMap = new Map<string, ScrapedItem>();
+  const skipItems = new Set(["Crop", "Fruit plant", "Fruit tree", "Artisan product."]);
+
+  // Get crops by season category
+  const seasonCategories = [
+    { category: "Category:Spring_crops", season: "spring" },
+    { category: "Category:Summer_crops", season: "summer" },
+    { category: "Category:Fall_crops", season: "fall" },
+    { category: "Category:Winter_crops", season: "winter" },
+    { category: "Category:Any_season_crops", season: "all" },
+    { category: "Category:Ocean_crops", season: "ocean" },
+  ];
+
+  console.log("  Fetching crop categories...");
+  
+  for (const { category, season } of seasonCategories) {
+    const members = await fetchCategoryMembers(category);
+    
+    for (const name of members) {
+      if (skipItems.has(name)) continue;
+
+      const existing = itemsMap.get(name);
+      if (existing) {
+        if (season === "all") {
+          existing.seasons = ["spring", "summer", "fall", "winter"];
+        } else if (season === "ocean") {
+          existing.metadata = { ...existing.metadata, ocean: true };
+        } else if (!existing.seasons?.includes(season)) {
+          existing.seasons?.push(season);
+        }
+      } else {
+        const item: ScrapedItem = {
+          name,
+          seasons: season === "all" ? ["spring", "summer", "fall", "winter"] : 
+                   season === "ocean" ? ["spring", "summer", "fall", "winter"] : [season],
+          time_of_day: [], // N/A for crops
+          weather: [], // N/A for crops
+          metadata: season === "ocean" ? { ocean: true } : {},
+        };
+        itemsMap.set(name, item);
+      }
+    }
+  }
+
+  const cropNames = [...itemsMap.keys()];
+  console.log(`  Found ${cropNames.length} crops`);
+
+  if (fastMode) {
+    return [...itemsMap.values()];
+  }
+
+  // Fetch individual pages for images, prices, and crop-specific data
+  console.log("  Fetching individual crop pages...");
+  
+  for (let i = 0; i < cropNames.length; i++) {
+    const name = cropNames[i]!;
+    showProgress(i + 1, cropNames.length, name);
+
+    const details = await fetchItemDetails(name);
+    const item = itemsMap.get(name)!;
+
+    if (details) {
+      item.base_price = details.base_price;
+      item.image_url = details.image_url;
+      item.description = details.description;
+      item.locations = details.locations;
+      
+      // Merge metadata (preserve existing ocean flag, add crop-specific data)
+      item.metadata = {
+        ...item.metadata,
+        ...details.metadata,
+      };
+    }
+  }
+
+  clearProgress();
+  return [...itemsMap.values()];
+}
+
+/**
+ * Scrape artifacts
+ */
+async function scrapeArtifacts(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const skipItems = new Set(["Artifact"]);
+
+  console.log("  Fetching artifact list from Category:Artifacts...");
+  const artifactNames = await fetchCategoryMembers("Category:Artifacts");
+  
+  const validArtifacts = [...artifactNames].filter(name => !skipItems.has(name));
+  console.log(`  Found ${validArtifacts.length} artifacts`);
+
+  if (fastMode) {
+    for (const name of validArtifacts) {
+      items.push({
+        name,
+        seasons: [], // N/A
+        time_of_day: [], // N/A
+        weather: [],
+        locations: ["Digging", "Geodes"],
+      });
+    }
+    return items;
+  }
+
+  // Fetch individual pages
+  console.log("  Fetching individual artifact pages...");
+  
+  for (let i = 0; i < validArtifacts.length; i++) {
+    const name = validArtifacts[i]!;
+    showProgress(i + 1, validArtifacts.length, name);
+
+    const details = await fetchItemDetails(name);
+
+    const item: ScrapedItem = {
+      name,
+      seasons: [], // N/A for artifacts
+      time_of_day: [], // N/A
+      weather: [],
+      locations: details?.locations || ["Digging", "Geodes"],
+      rarity: details?.rarity || "common",
+      base_price: details?.base_price,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata: details?.metadata || {},
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
+/**
+ * Scrape gems
+ */
+async function scrapeGems(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const skipItems = new Set(["Gem"]);
+
+  console.log("  Fetching gem list from Category:Gems...");
+  const gemNames = await fetchCategoryMembers("Category:Gems");
+  
+  const validGems = [...gemNames].filter(name => !skipItems.has(name));
+  console.log(`  Found ${validGems.length} gems`);
+
+  if (fastMode) {
+    for (const name of validGems) {
+      items.push({
+        name,
+        seasons: [], // N/A
+        time_of_day: [], // N/A
+        weather: [],
+        locations: ["Mining", "Geodes"],
+      });
+    }
+    return items;
+  }
+
+  // Fetch individual pages
+  console.log("  Fetching individual gem pages...");
+  
+  for (let i = 0; i < validGems.length; i++) {
+    const name = validGems[i]!;
+    showProgress(i + 1, validGems.length, name);
+
+    const details = await fetchItemDetails(name);
+
+    const item: ScrapedItem = {
+      name,
+      seasons: [], // N/A for gems
+      time_of_day: [], // N/A
+      weather: [],
+      locations: details?.locations || ["Mining", "Geodes"],
+      rarity: details?.rarity || "common",
+      base_price: details?.base_price,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata: details?.metadata || {},
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
+// ============ Database Functions ============
+
+async function clearCategory(categorySlug: string): Promise<void> {
+  const category = await sql`SELECT id FROM categories WHERE slug = ${categorySlug}`;
+  if (category.length > 0) {
+    await sql`DELETE FROM items WHERE category_id = ${category[0]!.id}`;
+    console.log(`  Cleared existing ${categorySlug} items`);
+  }
+}
+
+async function insertItems(categorySlug: string, items: ScrapedItem[]): Promise<number> {
+  const category = await sql`SELECT id FROM categories WHERE slug = ${categorySlug}`;
+  if (category.length === 0) {
+    console.error(`  Category ${categorySlug} not found`);
+    return 0;
+  }
+
+  const categoryId = category[0]!.id;
+  let inserted = 0;
+
+  for (const item of items) {
+    if (!item.name) continue;
+
+    const slug = slugify(item.name);
+
+    try {
+      await sql`
+        INSERT INTO items (
+          category_id, name, slug, rarity, seasons, time_of_day,
+          weather, locations, base_price, image_url, description, metadata
+        )
+        VALUES (
+          ${categoryId},
+          ${item.name},
+          ${slug},
+          ${item.rarity || null},
+          ${item.seasons || []},
+          ${item.time_of_day || []},
+          ${item.weather || []},
+          ${item.locations || []},
+          ${item.base_price || null},
+          ${item.image_url || null},
+          ${item.description || null},
+          ${JSON.stringify(item.metadata || {})}
+        )
+        ON CONFLICT (category_id, slug) DO UPDATE SET
+          name = EXCLUDED.name,
+          rarity = COALESCE(EXCLUDED.rarity, items.rarity),
+          seasons = EXCLUDED.seasons,
+          time_of_day = EXCLUDED.time_of_day,
+          weather = EXCLUDED.weather,
+          locations = EXCLUDED.locations,
+          base_price = COALESCE(EXCLUDED.base_price, items.base_price),
+          image_url = COALESCE(EXCLUDED.image_url, items.image_url),
+          description = COALESCE(EXCLUDED.description, items.description),
+          metadata = EXCLUDED.metadata
+      `;
+      inserted++;
+    } catch (error) {
+      console.error(`  Error inserting ${item.name}:`, error);
+    }
+  }
+
+  return inserted;
+}
+
+// ============ Main ============
+
+async function main() {
+  console.log("=".repeat(60));
+  console.log("  Coral Island Wiki Scraper");
+  console.log("=".repeat(60));
+  console.log();
+
+  const args = process.argv.slice(2);
+  const clearFirst = args.includes("--clear");
+  const fastMode = args.includes("--fast");
+  const categories = args.filter((a) => !a.startsWith("--"));
+
+  type ScraperFn = (fastMode: boolean) => Promise<ScrapedItem[]>;
+  
+  const scrapers: Record<string, ScraperFn> = {
+    fish: scrapeFish,
+    insects: scrapeInsects,
+    critters: scrapeCritters,
+    crops: scrapeCrops,
+    artifacts: scrapeArtifacts,
+    gems: scrapeGems,
+  };
+
+  const categoriesToScrape =
+    categories.length > 0 ? categories : Object.keys(scrapers);
+
+  console.log(`Categories: ${categoriesToScrape.join(", ")}`);
+  console.log(`Mode: ${fastMode ? "FAST (categories only)" : "FULL (individual pages)"}`);
+  if (clearFirst) console.log("Will clear existing items before inserting");
+  console.log();
+
+  const startTime = Date.now();
+  let totalInserted = 0;
+
+  for (const categorySlug of categoriesToScrape) {
+    const scraper = scrapers[categorySlug];
+    if (!scraper) {
+      console.log(`Unknown category: ${categorySlug}`);
+      continue;
+    }
+
+    console.log(`[${categorySlug.toUpperCase()}]`);
+
+    try {
+      if (clearFirst) {
+        await clearCategory(categorySlug);
+      }
+
+      const items = await scraper(fastMode);
+      
+      if (items.length > 0) {
+        const inserted = await insertItems(categorySlug, items);
+        console.log(`  Inserted/updated ${inserted} items`);
+        totalInserted += inserted;
+
+        // Show sample with data quality info
+        const withImages = items.filter(i => i.image_url).length;
+        const withPrices = items.filter(i => i.base_price).length;
+        const withSeasons = items.filter(i => i.seasons && i.seasons.length > 0).length;
+        console.log(`  Data: ${withImages} images, ${withPrices} prices, ${withSeasons} with seasons`);
+      }
+    } catch (error) {
+      console.error(`  Error processing ${categorySlug}:`, error);
+    }
+
+    console.log();
+  }
+
+  // Final summary
+  const counts = await sql`
+    SELECT c.name, c.slug, COUNT(i.id)::int as count
+    FROM categories c
+    LEFT JOIN items i ON i.category_id = c.id
+    GROUP BY c.id, c.name, c.slug, c.display_order
+    ORDER BY c.display_order
+  `;
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  console.log("=".repeat(60));
+  console.log("  DATABASE SUMMARY");
+  console.log("=".repeat(60));
+
+  let total = 0;
+  for (const row of counts) {
+    console.log(`  ${row.name.padEnd(12)}: ${row.count} items`);
+    total += row.count;
+  }
+  console.log("-".repeat(60));
+  console.log(`  TOTAL: ${total} items`);
+  console.log();
+  console.log(`  Inserted/updated ${totalInserted} items in ${elapsed}s`);
+
+  await sql.end();
+}
+
+main().catch(console.error);
