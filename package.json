@@ -10,6 +10,8 @@
     "build": "bun run --filter '*' build",
     "db:setup": "bun run packages/backend/src/db/setup.ts",
     "db:seed": "bun run packages/backend/src/db/seed.ts",
+    "db:migrate": "bun run packages/backend/src/db/migrations/001_add_forageables.ts",
+    "db:migrate:temple": "bun run packages/backend/src/db/migrations/002_add_lake_temple.ts",
     "scrape": "bun run scripts/scrape-wiki.ts"
   },
   "dependencies": {

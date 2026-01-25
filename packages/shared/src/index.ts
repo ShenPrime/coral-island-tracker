@@ -57,6 +57,47 @@ export const TIMES_OF_DAY: TimeOfDay[] = ["morning", "afternoon", "evening", "ni
 export const WEATHERS: Weather[] = ["sunny", "windy", "rain", "storm", "snow", "blizzard"];
 export const RARITIES: Rarity[] = ["common", "uncommon", "rare", "super_rare", "epic", "legendary"];
 
+export const FISHING_LOCATIONS = [
+  "River (Forest)",
+  "River (Town)",
+  "River (Farm)",
+  "Rice Field",
+  "Ocean (Forest)",
+  "Ocean (Dock)",
+  "Ocean (Lookout)",
+  "Ocean (Beach)",
+  "Pond",
+  "Estuary",
+  "Lake",
+  "Cavern Entrance",
+] as const;
+
+export type FishingLocation = (typeof FISHING_LOCATIONS)[number];
+
+export const FORAGING_LOCATIONS = [
+  "Beach",
+  "Forest",
+  "Lake",
+  "Town",
+  "Woodlands",
+  "Lookout",
+  "Vineyard",
+  "Hot Spring",
+  "Garden Lane",
+  "Ocean (Diving)",
+] as const;
+
+export type ForagingLocation = (typeof FORAGING_LOCATIONS)[number];
+
+export const LAKE_TEMPLE_ALTARS = [
+  "Crop Altar",
+  "Catch Altar",
+  "Advanced Altar",
+  "Rare Altar",
+] as const;
+
+export type LakeTempleAltar = (typeof LAKE_TEMPLE_ALTARS)[number];
+
 export const CATEGORY_SLUGS = [
   "fish",
   "insects",
@@ -64,6 +105,8 @@ export const CATEGORY_SLUGS = [
   "crops",
   "artifacts",
   "gems",
+  "forageables",
+  "lake-temple",
   "cooking",
   "npcs",
 ] as const;

@@ -14,10 +14,10 @@ const sizeClasses = {
 };
 
 const colorClasses = {
-  ocean: "bg-ocean-500",
-  coral: "bg-coral-500",
-  sand: "bg-sand-500",
-  green: "bg-green-500",
+  ocean: "bg-gradient-to-r from-ocean-500 to-ocean-400",
+  coral: "bg-gradient-to-r from-coral-500 to-coral-400",
+  sand: "bg-gradient-to-r from-sand-500 to-sand-400",
+  green: "bg-gradient-to-r from-palm-500 to-palm-400",
 };
 
 export function ProgressBar({
@@ -33,18 +33,18 @@ export function ProgressBar({
   return (
     <div className="w-full">
       {(label || showPercentage) && (
-        <div className="flex justify-between items-center mb-1">
-          {label && <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>}
+        <div className="flex justify-between items-center mb-1.5 sm:mb-2">
+          {label && <span className="text-xs sm:text-sm font-medium text-white">{label}</span>}
           {showPercentage && (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
+            <span className="text-xs sm:text-sm text-ocean-300">
               {value}/{max} ({percentage}%)
             </span>
           )}
         </div>
       )}
-      <div className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full ${sizeClasses[size]}`}>
+      <div className={`w-full bg-deepsea-900/80 rounded-full ${sizeClasses[size]} border border-ocean-800/30`}>
         <div
-          className={`${colorClasses[color]} ${sizeClasses[size]} rounded-full transition-all duration-300`}
+          className={`${colorClasses[color]} ${sizeClasses[size]} rounded-full transition-all duration-500 shadow-lg`}
           style={{ width: `${percentage}%` }}
         />
       </div>

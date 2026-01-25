@@ -92,8 +92,10 @@ async function setupDatabase() {
         ('Crops', 'crops', 'Plantable crops by season', 'carrot', 4),
         ('Artifacts', 'artifacts', 'Museum donation artifacts', 'scroll', 5),
         ('Gems', 'gems', 'Minerals and gems from mining', 'gem', 6),
-        ('Cooking', 'cooking', 'Recipes and cooked dishes', 'utensils', 7),
-        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 8)
+        ('Forageables', 'forageables', 'Foraged items from land and ocean including mushrooms, flowers, shells, and more', 'leaf', 7),
+        ('Lake Temple', 'lake-temple', 'Track your goddess temple altar offerings and unlock rewards', 'sun', 8),
+        ('Cooking', 'cooking', 'Recipes and cooked dishes', 'utensils', 9),
+        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 10)
     `;
 
     // Create a default save slot

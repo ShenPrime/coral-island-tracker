@@ -5,14 +5,22 @@ import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { getProgressItems, updateProgress, getCategory } from "@/lib/api";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { FISHING_LOCATIONS, FORAGING_LOCATIONS, LAKE_TEMPLE_ALTARS } from "@coral-tracker/shared";
 import type { Item, Category } from "@coral-tracker/shared";
 
 type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
 
 export function TrackCategory() {
   const { slug } = useParams<{ slug: string }>();
-  const { currentSaveId, searchQuery, selectedSeason, showCompleted } = useStore();
+  const { 
+    currentSaveId, 
+    searchQuery, 
+    selectedSeasons, 
+    selectedTimes,
+    selectedLocations,
+    showCompleted 
+  } = useStore();
 
   const [items, setItems] = useState<ItemWithProgress[]>([]);
   const [category, setCategory] = useState<(Category & { item_count: number }) | null>(null);
@@ -61,16 +69,52 @@ export function TrackCategory() {
     }
   };
 
-  // Filter items based on search and season
+  // Get available locations based on category
+  // For lake-temple, locations are the altar names
+  const availableLocations = 
+    slug === "fish" ? [...FISHING_LOCATIONS] : 
+    slug === "forageables" ? [...FORAGING_LOCATIONS] : 
+    slug === "lake-temple" ? [...LAKE_TEMPLE_ALTARS] :
+    [];
+
+  // Filter items based on all filters
   const filteredItems = items.filter((item) => {
     // Search filter
     if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
 
-    // Season filter
-    if (selectedSeason && item.seasons && !item.seasons.includes(selectedSeason)) {
-      return false;
+    // Season filter (match ANY selected season, or if item has no seasons it's "any season")
+    if (selectedSeasons.length > 0) {
+      const itemSeasons = item.seasons || [];
+      // Items with empty seasons array are available in all seasons
+      if (itemSeasons.length > 0 && !selectedSeasons.some((s) => itemSeasons.includes(s))) {
+        return false;
+      }
+    }
+
+    // Time filter (match ANY selected time)
+    if (selectedTimes.length > 0) {
+      const itemTimes = item.time_of_day || [];
+      // Items with empty time array are available at all times
+      if (itemTimes.length > 0 && !selectedTimes.some((t) => itemTimes.includes(t))) {
+        return false;
+      }
+    }
+
+    // Location filter (match ANY selected location - partial match)
+    if (selectedLocations.length > 0) {
+      const itemLocations = item.locations || [];
+      const itemLocationsLower = itemLocations.map((l) => l.toLowerCase());
+      const hasMatch = selectedLocations.some((selectedLoc) => {
+        const selectedLower = selectedLoc.toLowerCase();
+        return itemLocationsLower.some((itemLoc) => 
+          itemLoc.includes(selectedLower) || selectedLower.includes(itemLoc)
+        );
+      });
+      if (!hasMatch) {
+        return false;
+      }
     }
 
     return true;
@@ -84,10 +128,10 @@ export function TrackCategory() {
       <div className="max-w-4xl mx-auto">
         <div className="card text-center py-12">
           <AlertCircle size={48} className="mx-auto text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-white mb-2">
             No Save Slot Selected
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mb-6">
+          <p className="text-slate-400 mb-6">
             Please select a save slot first to track your progress
           </p>
           <Link to="/saves" className="btn btn-primary">
@@ -108,41 +152,40 @@ export function TrackCategory() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4"
-        >
-          <ArrowLeft size={18} />
-          Back to Dashboard
-        </Link>
+      {/* Sticky header with progress */}
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-deepsea-950 via-deepsea-950 to-transparent pb-3 sm:pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 pt-2">
+        {/* Header */}
+        <div className="mb-3 sm:mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+            {category?.name || "Loading..."}
+          </h1>
+          {category?.description && (
+            <p className="text-sm sm:text-base text-slate-400">{category.description}</p>
+          )}
+        </div>
 
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">
-          {category?.name || "Loading..."}
-        </h1>
-        {category?.description && (
-          <p className="text-slate-500 dark:text-slate-400">{category.description}</p>
-        )}
-      </div>
-
-      {/* Progress */}
-      <div className="card mb-6">
-        <ProgressBar
-          value={completedCount}
-          max={items.length}
-          label={`${category?.name} Progress`}
-          color={completedCount === items.length ? "green" : "ocean"}
-        />
+        {/* Progress */}
+        <div className="card p-4 sm:p-6">
+          <ProgressBar
+            value={completedCount}
+            max={items.length}
+            label={`${category?.name} Progress`}
+            color={completedCount === items.length ? "green" : "ocean"}
+          />
+        </div>
       </div>
 
       {/* Filters */}
-      <FilterBar />
+      <FilterBar 
+        availableLocations={availableLocations} 
+        items={items} 
+        locationLabel={slug === "lake-temple" ? "Altar" : "Location"}
+      />
 
       {/* Items grid */}
       {filteredItems.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-slate-500 dark:text-slate-400">
+        <div className="card text-center py-8 sm:py-12">
+          <p className="text-slate-400 text-sm sm:text-base">
             {items.length === 0
               ? "No items in this category yet. Run the seed script to add data."
               : "No items match your filters."}
@@ -150,10 +193,10 @@ export function TrackCategory() {
         </div>
       ) : (
         <>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
             Showing {filteredItems.length} items ({filteredCompletedCount} completed)
           </p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {filteredItems.map((item) => (
               <ItemCard key={item.id} item={item} onToggle={handleToggle} />
             ))}

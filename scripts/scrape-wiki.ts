@@ -950,6 +950,179 @@ async function scrapeGems(fastMode: boolean): Promise<ScrapedItem[]> {
   return items;
 }
 
+/**
+ * Scrape forageables - land forageables and ocean scavengeables
+ * Uses season categories to determine availability
+ */
+async function scrapeForageables(fastMode: boolean): Promise<ScrapedItem[]> {
+  const itemsMap = new Map<string, ScrapedItem>();
+  const oceanItems = new Set<string>();
+  
+  // Skip non-item pages and items that belong to other categories
+  const skipItems = new Set([
+    "Foraging",
+    "Trees",
+    "Scavengeables",
+    "Category:Scavengeables",
+  ]);
+
+  // First, get the list of ocean scavengeables to flag them
+  console.log("  Fetching ocean scavengeables list...");
+  const oceanScavengeables = await fetchCategoryMembers("Category:Ocean_scavengeables");
+  for (const name of oceanScavengeables) {
+    oceanItems.add(name);
+  }
+  console.log(`  Found ${oceanItems.size} ocean items`);
+
+  // Get forageables by season category
+  const seasonCategories = [
+    { category: "Category:Spring_scavengeables", season: "spring" },
+    { category: "Category:Summer_scavengeables", season: "summer" },
+    { category: "Category:Fall_scavengeables", season: "fall" },
+    { category: "Category:Winter_scavengeables", season: "winter" },
+    { category: "Category:Any_season_scavengeables", season: "all" },
+  ];
+
+  console.log("  Fetching seasonal scavengeable categories...");
+  
+  for (const { category, season } of seasonCategories) {
+    const members = await fetchCategoryMembers(category);
+    
+    for (const name of members) {
+      if (skipItems.has(name) || name.startsWith("Category:")) continue;
+
+      const existing = itemsMap.get(name);
+      const isOcean = oceanItems.has(name);
+      
+      if (existing) {
+        // Add season if not already present
+        if (season === "all") {
+          existing.seasons = ["spring", "summer", "fall", "winter"];
+        } else if (!existing.seasons?.includes(season)) {
+          existing.seasons?.push(season);
+        }
+      } else {
+        const item: ScrapedItem = {
+          name,
+          seasons: season === "all" ? ["spring", "summer", "fall", "winter"] : [season],
+          time_of_day: [], // N/A for forageables
+          weather: [], // N/A for forageables
+          locations: isOcean ? ["Ocean (Diving)"] : [],
+          metadata: isOcean ? { is_ocean: true } : {},
+        };
+        itemsMap.set(name, item);
+      }
+    }
+  }
+
+  // Also fetch from main Scavengeables category to catch any missed items
+  console.log("  Fetching main scavengeables category...");
+  const allScavengeables = await fetchCategoryMembers("Category:Scavengeables");
+  
+  for (const name of allScavengeables) {
+    if (skipItems.has(name) || name.startsWith("Category:")) continue;
+    
+    if (!itemsMap.has(name)) {
+      const isOcean = oceanItems.has(name);
+      const item: ScrapedItem = {
+        name,
+        seasons: isOcean ? ["spring", "summer", "fall", "winter"] : [], // Ocean items available all seasons
+        time_of_day: [],
+        weather: [],
+        locations: isOcean ? ["Ocean (Diving)"] : [],
+        metadata: isOcean ? { is_ocean: true } : {},
+      };
+      itemsMap.set(name, item);
+    }
+  }
+
+  const forageableNames = [...itemsMap.keys()];
+  console.log(`  Found ${forageableNames.length} forageables total`);
+
+  if (fastMode) {
+    return [...itemsMap.values()];
+  }
+
+  // Fetch individual pages for detailed info
+  console.log("  Fetching individual forageable pages...");
+  
+  for (let i = 0; i < forageableNames.length; i++) {
+    const name = forageableNames[i]!;
+    showProgress(i + 1, forageableNames.length, name);
+
+    const details = await fetchItemDetails(name);
+    const item = itemsMap.get(name)!;
+
+    if (details) {
+      item.base_price = details.base_price;
+      item.image_url = details.image_url;
+      item.description = details.description;
+      
+      // Use locations from wiki if available, otherwise keep default
+      if (details.locations && details.locations.length > 0) {
+        item.locations = details.locations;
+      }
+      
+      // Merge metadata (preserve is_ocean flag, add other details)
+      item.metadata = {
+        ...item.metadata,
+        ...details.metadata,
+      };
+
+      // Try to determine item group from type or infer from name/category
+      if (!item.metadata.item_group) {
+        item.metadata.item_group = inferItemGroup(name, details);
+      }
+    }
+  }
+
+  clearProgress();
+  return [...itemsMap.values()];
+}
+
+/**
+ * Infer the item group (Shell, Mushroom, Flower, etc.) from name and details
+ */
+function inferItemGroup(name: string, details: Partial<ScrapedItem> | null): string {
+  const nameLower = name.toLowerCase();
+  const typeLower = (details?.metadata?.type as string || "").toLowerCase();
+  
+  // Check for specific patterns
+  if (nameLower.includes("shell") || nameLower.includes("cowry")) return "Shell";
+  if (nameLower.includes("clam") || nameLower.includes("quahog") || nameLower.includes("geoduck")) return "Clam";
+  if (nameLower.includes("oyster")) return "Oyster";
+  if (nameLower.includes("mussel")) return "Mussel";
+  if (nameLower.includes("scallop")) return "Scallop";
+  if (nameLower.includes("urchin")) return "Sea Urchin";
+  if (nameLower.includes("barnacle")) return "Clam";
+  if (nameLower.includes("seaweed") || nameLower.includes("kelp") || nameLower.includes("arame") || 
+      nameLower.includes("kombu") || nameLower.includes("wakame") || nameLower.includes("lettuce") ||
+      nameLower.includes("grapes")) return "Seaweed";
+  if (nameLower.includes("mushroom") || nameLower.includes("morel") || nameLower.includes("shiitake") ||
+      nameLower.includes("matsutake") || nameLower.includes("trumpet")) return "Mushroom";
+  if (nameLower.includes("coconut")) return "Coconut";
+  if (typeLower.includes("flower") || nameLower.includes("hibiscus") || nameLower.includes("lotus") ||
+      nameLower.includes("tulip") || nameLower.includes("daffodil") || nameLower.includes("violet") ||
+      nameLower.includes("pansy") || nameLower.includes("larkspur") || nameLower.includes("cosmo") ||
+      nameLower.includes("jepun") || nameLower.includes("rafflesia") || nameLower.includes("titan arum")) return "Flower";
+  if (nameLower.includes("ginger") || nameLower.includes("ginseng") || nameLower.includes("wasabi") ||
+      nameLower.includes("bamboo")) return "Herb";
+  if (nameLower.includes("cherry") || nameLower.includes("fig") || nameLower.includes("mangosteen") ||
+      nameLower.includes("chestnut") || nameLower.includes("berry")) return "Fruit";
+  if (nameLower.includes("kale") || nameLower.includes("celery") || nameLower.includes("brussels") ||
+      nameLower.includes("eggplant") || nameLower.includes("canola") || nameLower.includes("shallot") ||
+      nameLower.includes("watercress")) return "Vegetable";
+  
+  // Default based on metadata type if available
+  if (typeLower) {
+    if (typeLower.includes("herb")) return "Herb";
+    if (typeLower.includes("vegetable")) return "Vegetable";
+    if (typeLower.includes("fruit")) return "Fruit";
+  }
+  
+  return "Other";
+}
+
 // ============ Database Functions ============
 
 async function clearCategory(categorySlug: string): Promise<void> {
@@ -1016,6 +1189,343 @@ async function insertItems(categorySlug: string, items: ScrapedItem[]): Promise<
   return inserted;
 }
 
+// ============ Lake Temple Offerings Constants ============
+
+// Hardcoded offerings data - scraped from wiki but stored here for reliability
+// The wiki page structure is complex and changes frequently
+const LAKE_TEMPLE_OFFERINGS = {
+  "Crop Altar": [
+    {
+      name: "Essential Resources",
+      items: [
+        { name: "Wood", quantity: 10 },
+        { name: "Stone", quantity: 10 },
+        { name: "Fiber", quantity: 10 },
+        { name: "Sap", quantity: 10 },
+        { name: "Any tree seed", quantity: 3, note: "Maple Seeds, Oak Seeds, or Pine Cone" },
+      ],
+      reward: "Recycling Machine",
+    },
+    {
+      name: "Spring Sesajen",
+      items: [
+        { name: "Turnip", quantity: 1 },
+        { name: "Carrot", quantity: 1 },
+        { name: "Daisy", quantity: 1 },
+        { name: "Wasabi", quantity: 1 },
+        { name: "Morel", quantity: 1 },
+      ],
+      reward: "Sugarcane Seeds",
+    },
+    {
+      name: "Summer Sesajen",
+      items: [
+        { name: "Blueberry", quantity: 1 },
+        { name: "Hot Pepper", quantity: 1 },
+        { name: "Sunflower", quantity: 1 },
+        { name: "Shallot", quantity: 1 },
+        { name: "Hibiscus", quantity: 1 },
+      ],
+      reward: "Tomato Seeds",
+    },
+    {
+      name: "Fall Sesajen",
+      items: [
+        { name: "Pumpkin", quantity: 1 },
+        { name: "Rice", quantity: 1, quality: "bronze" },
+        { name: "Orchid", quantity: 1 },
+        { name: "Black Trumpet", quantity: 1 },
+        { name: "Fig", quantity: 1 },
+      ],
+      reward: "Barley Seeds",
+    },
+    {
+      name: "Winter Sesajen",
+      items: [
+        { name: "Brussel Sprouts", quantity: 1 },
+        { name: "Kale", quantity: 1 },
+        { name: "Rose Hip", quantity: 1 },
+        { name: "Snowdrop", quantity: 1, quality: "osmium" },
+        { name: "Tea Leaf", quantity: 1 },
+      ],
+      reward: "Tea Seed",
+    },
+    {
+      name: "Ocean Scavengables",
+      items: [
+        { name: "Sea Salt", quantity: 5 },
+        { name: "Eastern Oyster", quantity: 5 },
+        { name: "Blue Mussel", quantity: 5 },
+        { name: "Any Kelp", quantity: 10, note: "Kelp, Sea Lettuce, Wakame, etc." },
+        { name: "Any Shell", quantity: 10, note: "Cowry, Conch, etc." },
+      ],
+      reward: "Dehydrator",
+    },
+  ],
+  "Catch Altar": [
+    {
+      name: "Fresh Water Fish",
+      items: [
+        { name: "Catfish", quantity: 1 },
+        { name: "Tilapia", quantity: 1 },
+        { name: "Rainbow Fish", quantity: 1 },
+        { name: "Silver Arowana", quantity: 1 },
+        { name: "Koi", quantity: 1 },
+      ],
+      reward: "Large Fish Bait",
+    },
+    {
+      name: "Salt Water Fish",
+      items: [
+        { name: "Pink Snapper", quantity: 1 },
+        { name: "Lionfish", quantity: 1 },
+        { name: "Asian Sheepshead", quantity: 1 },
+        { name: "Yellowfin Tuna", quantity: 1 },
+        { name: "Sardine", quantity: 1 },
+      ],
+      reward: "Small Fish Bait",
+    },
+    {
+      name: "Rare Fish",
+      items: [
+        { name: "Sturgeon", quantity: 1 },
+        { name: "Gator Gar", quantity: 1 },
+        { name: "Arapaima", quantity: 1 },
+        { name: "Giant Sea Bass", quantity: 1 },
+        { name: "Yellow Moray Eel", quantity: 1 },
+      ],
+      reward: "Fish Pond",
+    },
+    {
+      name: "Day Insect",
+      items: [
+        { name: "Pipevine Swallowtail Butterfly", quantity: 1 },
+        { name: "Tiger Beetle", quantity: 1 },
+        { name: "Yucca Moth", quantity: 1 },
+        { name: "Assam Silk Moth", quantity: 1 },
+        { name: "Monarch Caterpillar", quantity: 1 },
+      ],
+      reward: "Bee House",
+    },
+    {
+      name: "Night Insect",
+      items: [
+        { name: "Firefly", quantity: 1 },
+        { name: "Cecropia Caterpillar", quantity: 1 },
+        { name: "Centipede", quantity: 1 },
+        { name: "Rove Beetle", quantity: 1 },
+        { name: "Atlas Moth", quantity: 1 },
+      ],
+      reward: "Tap",
+    },
+    {
+      name: "Ocean Critters",
+      items: [
+        { name: "Cannonball Jellyfish", quantity: 1 },
+        { name: "Hermit Crab", quantity: 1 },
+        { name: "Sexy Shrimp", quantity: 1 },
+        { name: "Sunflower Sea Star", quantity: 1 },
+        { name: "Pom-pom Crab", quantity: 1 },
+      ],
+      reward: "Crawler Trap",
+    },
+  ],
+  "Advanced Altar": [
+    {
+      name: "Barn Animals",
+      items: [
+        { name: "Milk", quantity: 1 },
+        { name: "Goat Milk", quantity: 1 },
+        { name: "Wool", quantity: 1 },
+        { name: "Large Goat Milk", quantity: 1 },
+        { name: "Large Wool", quantity: 1 },
+        { name: "Large Milk", quantity: 1 },
+      ],
+      reward: "Cheese Press",
+    },
+    {
+      name: "Coop Animals",
+      items: [
+        { name: "Egg", quantity: 1 },
+        { name: "Duck Egg", quantity: 1 },
+        { name: "Large Egg", quantity: 1 },
+        { name: "Large Duck Egg", quantity: 1 },
+      ],
+      reward: "Mayonnaise Machine",
+    },
+    {
+      name: "Basic Cooking",
+      items: [
+        { name: "Smoothie", quantity: 1 },
+        { name: "Grilled Fish", quantity: 1 },
+        { name: "Tomato Soup", quantity: 1 },
+        { name: "Onigiri", quantity: 1 },
+        { name: "Fried Rice", quantity: 1 },
+      ],
+      reward: "Oil Press",
+    },
+    {
+      name: "Basic Artisan",
+      items: [
+        { name: "Any Mayonnaise", quantity: 1 },
+        { name: "Any Fruit Juice", quantity: 1 },
+        { name: "Any Butter", quantity: 1 },
+        { name: "Any Dried Scavengeable", quantity: 1 },
+        { name: "Any Pickle", quantity: 1 },
+      ],
+      reward: "Keg",
+    },
+    {
+      name: "Fruit Plant",
+      items: [
+        { name: "Rambutan", quantity: 1, quality: "silver" },
+        { name: "Durian", quantity: 1, quality: "silver" },
+        { name: "Mango", quantity: 1, quality: "silver" },
+        { name: "Dragonfruit", quantity: 1, quality: "silver" },
+        { name: "Apple", quantity: 1, quality: "silver" },
+      ],
+      reward: "Sprinkler II",
+    },
+    {
+      name: "Monster Drop",
+      items: [
+        { name: "Silky Fur", quantity: 5 },
+        { name: "Monster Essence", quantity: 5 },
+        { name: "Bat Wing", quantity: 5 },
+        { name: "Tough Meat", quantity: 5 },
+        { name: "Slime Goop", quantity: 5 },
+      ],
+      reward: "Explosive III",
+    },
+  ],
+  "Rare Altar": [
+    {
+      name: "Rare Crops",
+      items: [
+        { name: "Snowdrop", quantity: 1, quality: "osmium" },
+        { name: "Lemon", quantity: 1, quality: "osmium" },
+        { name: "Almond", quantity: 1, quality: "osmium" },
+        { name: "Cocoa Bean", quantity: 1, quality: "osmium" },
+        { name: "Coffee Bean", quantity: 1, quality: "osmium" },
+      ],
+      reward: "Sprinkler III",
+    },
+    {
+      name: "Greenhouse Crops",
+      items: [
+        { name: "Garlic", quantity: 1 },
+        { name: "Cotton", quantity: 1 },
+        { name: "Cactus", quantity: 1 },
+        { name: "Vanilla", quantity: 1 },
+        { name: "Saffron", quantity: 1 },
+      ],
+      reward: "Slime of Replication",
+    },
+    {
+      name: "Advanced Cooking",
+      items: [
+        { name: "Vegan Taco", quantity: 1 },
+        { name: "Apple Pie", quantity: 1 },
+        { name: "Serabi", quantity: 1 },
+        { name: "Pad Thai", quantity: 1 },
+        { name: "Es Cendol", quantity: 1 },
+      ],
+      reward: "Jamu Recipe",
+    },
+    {
+      name: "Master Artisan",
+      items: [
+        { name: "Titan Arum Black Honey", quantity: 1 },
+        { name: "Any Kimchi", quantity: 1 },
+        { name: "Any Wine", quantity: 1 },
+        { name: "Fermented Goat Cheese Wheel", quantity: 1 },
+        { name: "White Truffle Oil", quantity: 1 },
+      ],
+      reward: "Aging Barrel",
+    },
+    {
+      name: "Rare Animal Products",
+      items: [
+        { name: "Black Truffle", quantity: 1 },
+        { name: "Large Quail Egg", quantity: 1 },
+        { name: "Large Llama Wool", quantity: 1 },
+        { name: "Large Feather", quantity: 1 },
+        { name: "Large Gesha Coffee Bean", quantity: 1 },
+      ],
+      reward: "Auto Petter",
+    },
+    {
+      name: "Kelp Essence",
+      items: [
+        { name: "Gold Bar", quantity: 1 },
+        { name: "Silver Bar", quantity: 1 },
+        { name: "Bronze Bar", quantity: 1 },
+        { name: "Gold Kelp Essence", quantity: 1 },
+        { name: "Silver Kelp Essence", quantity: 1 },
+        { name: "Bronze Kelp Essence", quantity: 1 },
+      ],
+      reward: "Osmium Kelp Essence",
+    },
+  ],
+};
+
+// Image URLs for offerings (scraped from wiki)
+const OFFERING_IMAGES: Record<string, string> = {
+  "Essential Resources": "https://static.wikia.nocookie.net/coralisland/images/b/b8/Essential_Resources_Offering.png",
+  "Spring Sesajen": "https://static.wikia.nocookie.net/coralisland/images/d/d2/Spring_Sesajen_Offering.png",
+  "Summer Sesajen": "https://static.wikia.nocookie.net/coralisland/images/d/de/Summer_Sesajen_Offering.png",
+  "Fall Sesajen": "https://static.wikia.nocookie.net/coralisland/images/b/b6/Fall_Sesajen_Offering.png",
+  "Winter Sesajen": "https://static.wikia.nocookie.net/coralisland/images/e/e7/Winter_Sesajen_Offering.png",
+  "Ocean Scavengables": "https://static.wikia.nocookie.net/coralisland/images/1/1b/Ocean_Scavengables_Offering.png",
+  "Fresh Water Fish": "https://static.wikia.nocookie.net/coralisland/images/f/f6/Fresh_Water_Fish_Offering.png",
+  "Salt Water Fish": "https://static.wikia.nocookie.net/coralisland/images/3/35/Salt_Water_Fish_Offering.png",
+  "Rare Fish": "https://static.wikia.nocookie.net/coralisland/images/f/f6/Rare_Fish_Offering.png",
+  "Day Insect": "https://static.wikia.nocookie.net/coralisland/images/6/64/Day_Insect_Offering.png",
+  "Night Insect": "https://static.wikia.nocookie.net/coralisland/images/c/c6/Night_Insect_Offering.png",
+  "Ocean Critters": "https://static.wikia.nocookie.net/coralisland/images/1/16/Ocean_Critters_Offering.png",
+  "Barn Animals": "https://static.wikia.nocookie.net/coralisland/images/7/70/Barn_Animals_Offering.png",
+  "Coop Animals": "https://static.wikia.nocookie.net/coralisland/images/2/22/Coop_Animals_Offering.png",
+  "Basic Cooking": "https://static.wikia.nocookie.net/coralisland/images/9/93/Basic_Cooking_Offering.png",
+  "Basic Artisan": "https://static.wikia.nocookie.net/coralisland/images/6/69/Basic_Artisan_Offering.png",
+  "Fruit Plant": "https://static.wikia.nocookie.net/coralisland/images/3/37/Fruit_Plant_Offering.png",
+  "Monster Drop": "https://static.wikia.nocookie.net/coralisland/images/0/0e/Monster_Drop_Offering.png",
+  "Rare Crops": "https://static.wikia.nocookie.net/coralisland/images/9/96/Rare_Crops_Offering.png",
+  "Greenhouse Crops": "https://static.wikia.nocookie.net/coralisland/images/4/4a/Greenhouse_Crops_Offering.png",
+  "Advanced Cooking": "https://static.wikia.nocookie.net/coralisland/images/a/a1/Advanced_Cooking_Offering.png",
+  "Master Artisan": "https://static.wikia.nocookie.net/coralisland/images/5/5a/Master_Artisan_Offering.png",
+  "Rare Animal Products": "https://static.wikia.nocookie.net/coralisland/images/e/e2/Rare_Animal_Products_Offering.png",
+  "Kelp Essence": "https://static.wikia.nocookie.net/coralisland/images/8/8c/Kelp_Essence_Offering.png",
+};
+
+/**
+ * Scrape Lake Temple offerings - uses hardcoded data as wiki structure is complex
+ */
+async function scrapeLakeTemple(_fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+
+  console.log("  Processing Lake Temple offerings from hardcoded data...");
+  
+  for (const [altarName, offerings] of Object.entries(LAKE_TEMPLE_OFFERINGS)) {
+    for (const offering of offerings) {
+      const item: ScrapedItem = {
+        name: offering.name,
+        locations: [altarName], // Use locations field as altar filter
+        image_url: OFFERING_IMAGES[offering.name],
+        metadata: {
+          altar: altarName,
+          required_items: offering.items,
+          reward: offering.reward,
+          item_count: offering.items.length,
+        },
+      };
+      items.push(item);
+    }
+  }
+
+  console.log(`  Found ${items.length} offerings across 4 altars`);
+  return items;
+}
+
 // ============ Main ============
 
 async function main() {
@@ -1038,6 +1548,8 @@ async function main() {
     crops: scrapeCrops,
     artifacts: scrapeArtifacts,
     gems: scrapeGems,
+    forageables: scrapeForageables,
+    "lake-temple": scrapeLakeTemple,
   };
 
   const categoriesToScrape =

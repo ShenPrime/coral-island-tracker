@@ -12,33 +12,213 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(to bottom right, #f0f9ff, #fefce8);
+  background: linear-gradient(135deg, #0a1525 0%, #003035 50%, #0f1f35 100%);
 }
 
-.dark body {
-  background: linear-gradient(to bottom right, #082f49, #0f172a);
+/* Card animations */
+@keyframes checkPop {
+  0% { 
+    transform: scale(0.5) rotate(-10deg); 
+    opacity: 0; 
+  }
+  60% { 
+    transform: scale(1.15) rotate(5deg); 
+  }
+  100% { 
+    transform: scale(1.1) rotate(0deg); 
+    opacity: 1; 
+  }
+}
+
+@keyframes cardComplete {
+  0% { 
+    box-shadow: 0 0 0 0 rgba(0, 232, 92, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 30px 5px rgba(0, 232, 92, 0.3), 0 0 60px 10px rgba(0, 232, 92, 0.1);
+  }
+  100% { 
+    box-shadow: 0 0 20px rgba(0, 232, 92, 0.1), 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 232, 92, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(0, 232, 92, 0.5), 0 0 30px rgba(0, 232, 92, 0.3); }
+}
+
+.animate-check-pop {
+  animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-card-complete {
+  animation: cardComplete 0.6s ease-out forwards;
+}
+
+/* Card styles */
+.card {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.25s ease,
+              border-color 0.25s ease,
+              background-color 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 20px 40px -10px rgba(0, 201, 196, 0.15),
+              0 10px 20px -5px rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 201, 196, 0.4);
+}
+
+.completed-card {
+  background: linear-gradient(135deg, rgba(0, 151, 60, 0.15) 0%, rgba(22, 44, 74, 0.9) 100%);
+  border-color: rgba(0, 232, 92, 0.4) !important;
+  box-shadow: 0 0 20px rgba(0, 232, 92, 0.1),
+              0 10px 30px -10px rgba(0, 0, 0, 0.3);
+}
+
+.completed-card:hover {
+  box-shadow: 0 0 30px rgba(0, 232, 92, 0.15),
+              0 20px 40px -10px rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 232, 92, 0.5) !important;
+}
+
+.checkbox-completed {
+  background: linear-gradient(135deg, #2bfd7f 0%, #00c249 100%);
+  border-color: #2bfd7f;
+  color: white;
+  box-shadow: 0 0 15px rgba(0, 232, 92, 0.4);
+  transform: scale(1.1);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.25s ease;
+}
+
+/* Sidebar navigation */
+.nav-item {
+  position: relative;
+  z-index: 1;
+}
+
+.nav-item:hover {
+  text-shadow: 0 0 20px rgba(0, 201, 196, 0.5);
+}
+
+.nav-indicator {
+  z-index: 0;
+}
+
+/* Dropdown animations */
+@keyframes dropdownSlideIn {
+  0% {
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes dropdownSlideOut {
+  0% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+.dropdown-menu {
+  clip-path: inset(0 0 100% 0);
+}
+
+.dropdown-open {
+  animation: dropdownSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dropdown-close {
+  animation: dropdownSlideOut 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal animations */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop {
+  animation: modalFadeIn 0.2s ease-out forwards;
+}
+
+.modal-content {
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Hide scrollbar for horizontal filter scroll on mobile */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
   }
   
   .btn-primary {
-    @apply bg-ocean-500 text-white hover:bg-ocean-600;
+    @apply text-white shadow-lg;
+    background: linear-gradient(to right, #00c9c4, #00e5df);
+    box-shadow: 0 10px 15px -3px rgba(0, 201, 196, 0.25);
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(to right, #00e5df, #3afbf5);
   }
   
   .btn-secondary {
-    @apply bg-sand-200 text-sand-800 hover:bg-sand-300;
+    @apply text-slate-200;
+    background-color: #1e3a5f;
+    border: 1px solid rgba(0, 130, 128, 0.5);
+  }
+  
+  .btn-secondary:hover {
+    background-color: #162c4a;
   }
   
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6;
+    @apply backdrop-blur-sm rounded-xl shadow-xl p-6;
+    background-color: rgba(22, 44, 74, 0.9);
+    border: 1px solid rgba(4, 79, 80, 0.3);
   }
   
   .input {
-    @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 
-           bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 
-           focus:ring-ocean-500 dark:focus:ring-ocean-400;
+    @apply w-full px-4 py-2 rounded-lg text-white placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-ocean-400;
+    background-color: rgba(15, 31, 53, 0.9);
+    border: 1px solid rgba(0, 101, 102, 0.5);
+  }
+  
+  .input:focus {
+    border-color: #00e5df;
   }
 }
