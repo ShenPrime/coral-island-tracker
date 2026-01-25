@@ -12,6 +12,7 @@
     "db:seed": "bun run packages/backend/src/db/seed.ts",
     "db:migrate": "bun run packages/backend/src/db/migrations/001_add_forageables.ts",
     "db:migrate:temple": "bun run packages/backend/src/db/migrations/002_add_lake_temple.ts",
+    "db:migrate:temple-redesign": "bun run packages/backend/src/db/migrations/003_temple_redesign.ts",
     "scrape": "bun run scripts/scrape-wiki.ts"
   },
   "dependencies": {

@@ -106,10 +106,18 @@ export const CATEGORY_SLUGS = [
   "artifacts",
   "gems",
   "forageables",
-  "lake-temple",
   "cooking",
   "npcs",
 ] as const;
+
+export const ALTAR_SLUGS = [
+  "crop-altar",
+  "catch-altar", 
+  "advanced-altar",
+  "rare-altar",
+] as const;
+
+export type AltarSlug = (typeof ALTAR_SLUGS)[number];
 
 export type CategorySlug = (typeof CATEGORY_SLUGS)[number];
 
@@ -187,4 +195,95 @@ export interface ApiError {
   error: string;
   message: string;
   success: false;
+}
+
+// ============================================
+// Temple Types
+// ============================================
+
+export interface TempleRequirement {
+  id: number;
+  altar_slug: string;
+  altar_name: string;
+  offering_slug: string;
+  offering_name: string;
+  offering_image_url: string | null;
+  reward: string | null;
+  item_name: string;
+  item_id: number | null;
+  quantity: number;
+  quality: string | null;
+  note: string | null;
+  display_order: number;
+}
+
+export interface TempleProgress {
+  id: number;
+  save_slot_id: number;
+  temple_requirement_id: number;
+  offered: boolean;
+  offered_at: Date | null;
+}
+
+// Temple item with progress and linked item details
+export interface TempleItemWithProgress extends TempleRequirement {
+  offered: boolean;
+  offered_at: Date | null;
+  // Linked item details (if item exists in database)
+  linked_item?: Item | null;
+}
+
+export interface OfferingWithItems {
+  slug: string;
+  name: string;
+  image_url: string | null;
+  reward: string | null;
+  items: TempleItemWithProgress[];
+  total_items: number;
+  offered_items: number;
+  is_complete: boolean;
+}
+
+export interface AltarWithOfferings {
+  slug: string;
+  name: string;
+  offerings: OfferingWithItems[];
+  total_items: number;
+  offered_items: number;
+  total_offerings: number;
+  completed_offerings: number;
+}
+
+export interface AltarSummary {
+  slug: string;
+  name: string;
+  total_items: number;
+  offered_items: number;
+  total_offerings: number;
+  completed_offerings: number;
+}
+
+export interface TempleOverview {
+  altars: AltarSummary[];
+  total_items: number;
+  offered_items: number;
+  total_offerings: number;
+  completed_offerings: number;
+}
+
+export interface UpdateTempleProgressRequest {
+  offered: boolean;
+}
+
+// Check if an item is required for temple (for category pages)
+export interface ItemTempleStatus {
+  is_temple_requirement: boolean;
+  requirements: {
+    requirement_id: number;
+    altar_name: string;
+    offering_name: string;
+    quantity: number;
+    quality: string | null;
+    offered: boolean;
+  }[];
 }

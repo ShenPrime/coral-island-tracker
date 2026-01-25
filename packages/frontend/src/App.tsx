@@ -4,6 +4,8 @@ import { Layout } from "@/components/Layout";
 import { Dashboard } from "@/pages/Dashboard";
 import { SaveSlots } from "@/pages/SaveSlots";
 import { TrackCategory } from "@/pages/TrackCategory";
+import { LakeTempleOverview } from "@/pages/LakeTempleOverview";
+import { AltarDetail } from "@/pages/AltarDetail";
 import { useStore } from "@/store/useStore";
 import { getCategories, getSaveSlots } from "@/lib/api";
 
@@ -35,6 +37,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/saves" element={<SaveSlots />} />
+        <Route path="/temple" element={<LakeTempleOverview />} />
+        <Route path="/temple/:altarSlug" element={<AltarDetail />} />
         <Route path="/track/:slug" element={<TrackCategory />} />
       </Routes>
     </Layout>

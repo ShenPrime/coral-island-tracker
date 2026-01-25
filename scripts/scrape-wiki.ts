@@ -1549,7 +1549,7 @@ async function main() {
     artifacts: scrapeArtifacts,
     gems: scrapeGems,
     forageables: scrapeForageables,
-    "lake-temple": scrapeLakeTemple,
+    // Note: lake-temple is now handled via migration, not scraper
   };
 
   const categoriesToScrape =

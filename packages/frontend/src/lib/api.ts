@@ -7,6 +7,9 @@ import type {
   BulkUpdateProgressRequest,
   ItemsQueryParams,
   CategoryStats,
+  TempleOverview,
+  AltarWithOfferings,
+  ItemTempleStatus,
 } from "@coral-tracker/shared";
 
 const API_BASE = "/api";
@@ -120,4 +123,41 @@ export async function bulkUpdateProgress(
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+// Temple
+export async function getTempleOverview(saveId: number): Promise<TempleOverview> {
+  return fetchApi<TempleOverview>(`/temple/altars?saveId=${saveId}`);
+}
+
+export async function getAltarDetail(saveId: number, altarSlug: string): Promise<AltarWithOfferings> {
+  return fetchApi<AltarWithOfferings>(`/temple/altars/${altarSlug}?saveId=${saveId}`);
+}
+
+export async function updateTempleProgress(
+  saveId: number,
+  requirementId: number,
+  offered: boolean
+): Promise<void> {
+  await fetchApi(`/temple/progress/${requirementId}?saveId=${saveId}`, {
+    method: "PUT",
+    body: JSON.stringify({ offered }),
+  });
+}
+
+export async function getItemTempleStatus(
+  saveId: number,
+  itemId: number
+): Promise<ItemTempleStatus> {
+  return fetchApi<ItemTempleStatus>(`/temple/item/${itemId}?saveId=${saveId}`);
+}
+
+export async function getItemsTempleStatus(
+  saveId: number,
+  itemIds: number[]
+): Promise<Record<number, ItemTempleStatus>> {
+  if (itemIds.length === 0) return {};
+  return fetchApi<Record<number, ItemTempleStatus>>(
+    `/temple/items-status?saveId=${saveId}&itemIds=${itemIds.join(",")}`
+  );
 }

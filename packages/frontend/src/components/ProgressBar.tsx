@@ -3,11 +3,12 @@ interface ProgressBarProps {
   max: number;
   label?: string;
   showPercentage?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   color?: "ocean" | "coral" | "sand" | "green";
 }
 
 const sizeClasses = {
+  xs: "h-1.5",
   sm: "h-2",
   md: "h-3",
   lg: "h-4",

@@ -4,10 +4,10 @@ import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
 import { ProgressBar } from "@/components/ProgressBar";
-import { getProgressItems, updateProgress, getCategory } from "@/lib/api";
+import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
-import { FISHING_LOCATIONS, FORAGING_LOCATIONS, LAKE_TEMPLE_ALTARS } from "@coral-tracker/shared";
-import type { Item, Category } from "@coral-tracker/shared";
+import { FISHING_LOCATIONS, FORAGING_LOCATIONS } from "@coral-tracker/shared";
+import type { Item, Category, ItemTempleStatus } from "@coral-tracker/shared";
 
 type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
 
@@ -24,6 +24,7 @@ export function TrackCategory() {
 
   const [items, setItems] = useState<ItemWithProgress[]>([]);
   const [category, setCategory] = useState<(Category & { item_count: number }) | null>(null);
+  const [templeStatus, setTempleStatus] = useState<Record<number, ItemTempleStatus>>({});
   const [loading, setLoading] = useState(true);
 
   const loadItems = useCallback(async () => {
@@ -37,6 +38,13 @@ export function TrackCategory() {
       ]);
       setItems(itemsData);
       setCategory(categoryData);
+
+      // Load temple status for all items
+      const itemIds = itemsData.map((item) => item.id);
+      if (itemIds.length > 0) {
+        const status = await getItemsTempleStatus(currentSaveId, itemIds);
+        setTempleStatus(status);
+      }
     } catch (error) {
       console.error("Failed to load items:", error);
     } finally {
@@ -69,12 +77,42 @@ export function TrackCategory() {
     }
   };
 
+  const handleToggleOffered = async (itemId: number, requirementId: number, offered: boolean) => {
+    if (!currentSaveId) return;
+
+    // Optimistic update
+    setTempleStatus((prev) => {
+      const itemStatus = prev[itemId];
+      if (!itemStatus) return prev;
+      
+      return {
+        ...prev,
+        [itemId]: {
+          ...itemStatus,
+          requirements: itemStatus.requirements.map((req) =>
+            req.requirement_id === requirementId ? { ...req, offered } : req
+          ),
+        },
+      };
+    });
+
+    try {
+      await updateTempleProgress(currentSaveId, requirementId, offered);
+    } catch (error) {
+      console.error("Failed to update temple progress:", error);
+      // Reload temple status on error
+      const itemIds = items.map((item) => item.id);
+      if (itemIds.length > 0) {
+        const status = await getItemsTempleStatus(currentSaveId, itemIds);
+        setTempleStatus(status);
+      }
+    }
+  };
+
   // Get available locations based on category
-  // For lake-temple, locations are the altar names
   const availableLocations = 
     slug === "fish" ? [...FISHING_LOCATIONS] : 
     slug === "forageables" ? [...FORAGING_LOCATIONS] : 
-    slug === "lake-temple" ? [...LAKE_TEMPLE_ALTARS] :
     [];
 
   // Filter items based on all filters
@@ -179,7 +217,6 @@ export function TrackCategory() {
       <FilterBar 
         availableLocations={availableLocations} 
         items={items} 
-        locationLabel={slug === "lake-temple" ? "Altar" : "Location"}
       />
 
       {/* Items grid */}
@@ -198,7 +235,13 @@ export function TrackCategory() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {filteredItems.map((item) => (
-              <ItemCard key={item.id} item={item} onToggle={handleToggle} />
+              <ItemCard 
+                key={item.id} 
+                item={item} 
+                onToggle={handleToggle}
+                templeStatus={templeStatus[item.id]}
+                onToggleOffered={(requirementId, offered) => handleToggleOffered(item.id, requirementId, offered)}
+              />
             ))}
           </div>
         </>

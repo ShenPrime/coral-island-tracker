@@ -26,7 +26,6 @@ const categoryIcons: Record<string, React.ReactNode> = {
   artifacts: <Scroll size={20} />,
   gems: <Gem size={20} />,
   forageables: <Leaf size={20} />,
-  "lake-temple": <Sun size={20} />,
   cooking: <UtensilsCrossed size={20} />,
   npcs: <Users size={20} />,
 };
@@ -173,6 +172,15 @@ export function Layout({ children }: LayoutProps) {
               >
                 <Save size={20} />
                 <span>Save Slots</span>
+              </NavItem>
+
+              <NavItem 
+                to="/temple" 
+                isActive={location.pathname.startsWith("/temple")}
+                registerRef={registerRef("/temple")}
+              >
+                <Sun size={20} />
+                <span>Lake Temple</span>
               </NavItem>
             </nav>
 

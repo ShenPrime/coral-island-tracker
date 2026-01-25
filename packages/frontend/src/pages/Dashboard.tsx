@@ -14,7 +14,6 @@ import {
   Rabbit,
   AlertCircle,
   Leaf,
-  Sun,
 } from "lucide-react";
 import type { CategoryStats } from "@coral-tracker/shared";
 
@@ -26,7 +25,6 @@ const categoryIcons: Record<string, { sm: React.ReactNode; lg: React.ReactNode }
   artifacts: { sm: <Scroll size={20} />, lg: <Scroll size={24} /> },
   gems: { sm: <Gem size={20} />, lg: <Gem size={24} /> },
   forageables: { sm: <Leaf size={20} />, lg: <Leaf size={24} /> },
-  "lake-temple": { sm: <Sun size={20} />, lg: <Sun size={24} /> },
   cooking: { sm: <UtensilsCrossed size={20} />, lg: <UtensilsCrossed size={24} /> },
   npcs: { sm: <Users size={20} />, lg: <Users size={24} /> },
 };

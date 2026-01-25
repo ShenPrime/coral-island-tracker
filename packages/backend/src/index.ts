@@ -6,6 +6,7 @@ import categoriesRouter from "./routes/categories";
 import itemsRouter from "./routes/items";
 import savesRouter from "./routes/saves";
 import progressRouter from "./routes/progress";
+import templeRouter from "./routes/temple";
 
 const app = new Hono();
 
@@ -35,6 +36,7 @@ app.route("/api/categories", categoriesRouter);
 app.route("/api/items", itemsRouter);
 app.route("/api/saves", savesRouter);
 app.route("/api/progress", progressRouter);
+app.route("/api/temple", templeRouter);
 
 // 404 handler
 app.notFound((c) => {
@@ -58,13 +60,17 @@ console.log(`
   Server running at http://localhost:${port}
   
   Endpoints:
-    GET  /health              - Health check
-    GET  /api/categories      - List categories
-    GET  /api/items           - List items (with filters)
-    GET  /api/saves           - List save slots
-    POST /api/saves           - Create save slot
-    GET  /api/progress/:id    - Get progress for save slot
-    PUT  /api/progress/:s/:i  - Update item progress
+    GET  /health                    - Health check
+    GET  /api/categories            - List categories
+    GET  /api/items                 - List items (with filters)
+    GET  /api/saves                 - List save slots
+    POST /api/saves                 - Create save slot
+    GET  /api/progress/:id          - Get progress for save slot
+    PUT  /api/progress/:s/:i        - Update item progress
+    GET  /api/temple/altars         - Temple overview with altars
+    GET  /api/temple/altars/:slug   - Altar detail with offerings
+    PUT  /api/temple/progress/:id   - Update temple item offered status
+    GET  /api/temple/item/:itemId   - Check if item is temple requirement
 `);
 
 export default {

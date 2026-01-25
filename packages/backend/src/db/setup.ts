@@ -83,6 +83,7 @@ async function setupDatabase() {
     await sql`CREATE INDEX idx_progress_completed ON progress(save_slot_id, completed)`;
 
     // Insert default categories
+    // Note: Lake Temple is handled separately via temple_requirements table
     console.log("Inserting default categories...");
     await sql`
       INSERT INTO categories (name, slug, description, icon, display_order) VALUES
@@ -93,9 +94,8 @@ async function setupDatabase() {
         ('Artifacts', 'artifacts', 'Museum donation artifacts', 'scroll', 5),
         ('Gems', 'gems', 'Minerals and gems from mining', 'gem', 6),
         ('Forageables', 'forageables', 'Foraged items from land and ocean including mushrooms, flowers, shells, and more', 'leaf', 7),
-        ('Lake Temple', 'lake-temple', 'Track your goddess temple altar offerings and unlock rewards', 'sun', 8),
-        ('Cooking', 'cooking', 'Recipes and cooked dishes', 'utensils', 9),
-        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 10)
+        ('Cooking', 'cooking', 'Recipes and cooked dishes', 'utensils', 8),
+        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 9)
     `;
 
     // Create a default save slot
