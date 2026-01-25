@@ -529,6 +529,44 @@ function parseInfobox(html: string): Partial<ScrapedItem> {
     metadata.unlock_requirement = unlock;
   }
 
+  // ============ ARTISAN-SPECIFIC FIELDS ============
+
+  // Machine (equipment used to craft)
+  const machine = extractDataValue("machine");
+  if (machine) {
+    metadata.equipment = machine;
+  }
+
+  // Input ingredient
+  const input = extractDataValue("input");
+  if (input) {
+    metadata.input = input;
+  }
+
+  // Processing time (careful not to overwrite time_of_day parsing)
+  const processingTime = extractDataValue("time");
+  if (processingTime && !item.time_of_day?.length) {
+    const daysMatch = processingTime.match(/(\d+)\s*days?/i);
+    const hoursMatch = processingTime.match(/(\d+)\s*hours?/i);
+    const minutesMatch = processingTime.match(/(\d+)\s*min/i);
+    if (daysMatch) {
+      metadata.processing_time = `${daysMatch[1]} days`;
+      metadata.processing_days = parseInt(daysMatch[1], 10);
+    } else if (hoursMatch) {
+      metadata.processing_time = `${hoursMatch[1]} hours`;
+      metadata.processing_hours = parseInt(hoursMatch[1], 10);
+    } else if (minutesMatch) {
+      metadata.processing_time = `${minutesMatch[1]} min`;
+      metadata.processing_minutes = parseInt(minutesMatch[1], 10);
+    }
+  }
+
+  // Item group (Wine, Cheese, Oil, etc.)
+  const itemGroup = extractDataValue("item_group");
+  if (itemGroup) {
+    metadata.item_group = itemGroup;
+  }
+
   // ============ STORE METADATA ============
   if (Object.keys(metadata).length > 0) {
     item.metadata = metadata;
@@ -1123,6 +1161,130 @@ function inferItemGroup(name: string, details: Partial<ScrapedItem> | null): str
   return "Other";
 }
 
+// ============ Artisan Products Scraper ============
+
+/**
+ * Equipment categories for artisan products
+ */
+const EQUIPMENT_CATEGORIES = [
+  "Category:Aging_barrel",
+  "Category:Bee_house",
+  "Category:Cheese_press",
+  "Category:Dehydrator",
+  "Category:Keg",
+  "Category:Loom",
+  "Category:Mason_jar",
+  "Category:Mayonnaise_machine",
+  "Category:Mill",
+  "Category:Oil_press",
+  "Category:Tap",
+] as const;
+
+/**
+ * Map equipment category names to display names
+ */
+const EQUIPMENT_NAMES: Record<string, string> = {
+  "Category:Aging_barrel": "Aging Barrel",
+  "Category:Bee_house": "Bee House",
+  "Category:Cheese_press": "Cheese Press",
+  "Category:Dehydrator": "Dehydrator",
+  "Category:Keg": "Keg",
+  "Category:Loom": "Loom",
+  "Category:Mason_jar": "Mason Jar",
+  "Category:Mayonnaise_machine": "Mayonnaise Machine",
+  "Category:Mill": "Mill",
+  "Category:Oil_press": "Oil Press",
+  "Category:Tap": "Tap",
+};
+
+/**
+ * Scrape artisan products - processed goods from artisan equipment
+ */
+async function scrapeArtisanProducts(fastMode: boolean): Promise<ScrapedItem[]> {
+  const itemsMap = new Map<string, ScrapedItem>();
+  const equipmentMap = new Map<string, string>(); // item name -> equipment type
+
+  const skipItems = new Set([
+    "Artisan product",
+    "Artisan products",
+    "Artisan_product",
+    "Artisan_products",
+  ]);
+
+  // Build equipment mapping by fetching each equipment category
+  console.log("  Fetching equipment categories...");
+  for (const category of EQUIPMENT_CATEGORIES) {
+    const members = await fetchCategoryMembers(category);
+    const equipmentName = EQUIPMENT_NAMES[category] || category.replace("Category:", "").replace(/_/g, " ");
+
+    for (const name of members) {
+      if (!name.startsWith("Category:") && !skipItems.has(name)) {
+        equipmentMap.set(name, equipmentName);
+      }
+    }
+  }
+  console.log(`  Found ${equipmentMap.size} items with equipment mapping`);
+
+  // Fetch all artisan products from main category
+  console.log("  Fetching artisan products list...");
+  const allProducts = await fetchCategoryMembers("Category:Artisan_products");
+
+  for (const name of allProducts) {
+    if (skipItems.has(name) || name.startsWith("Category:")) continue;
+
+    const equipment = equipmentMap.get(name);
+
+    const item: ScrapedItem = {
+      name,
+      seasons: [], // N/A for artisan products
+      time_of_day: [],
+      weather: [],
+      locations: [],
+      metadata: equipment ? { equipment } : {},
+    };
+
+    itemsMap.set(name, item);
+  }
+
+  const productNames = [...itemsMap.keys()];
+  console.log(`  Found ${productNames.length} artisan products total`);
+
+  if (fastMode) {
+    return [...itemsMap.values()];
+  }
+
+  // Fetch individual pages for detailed info
+  console.log("  Fetching individual product pages...");
+
+  for (let i = 0; i < productNames.length; i++) {
+    const name = productNames[i]!;
+    showProgress(i + 1, productNames.length, name);
+
+    const details = await fetchItemDetails(name);
+    const item = itemsMap.get(name)!;
+
+    if (details) {
+      item.base_price = details.base_price;
+      item.image_url = details.image_url;
+      item.description = details.description;
+
+      // Merge metadata (preserve equipment from category, add other details)
+      item.metadata = {
+        ...item.metadata,
+        ...details.metadata,
+      };
+
+      // Use equipment from page if we didn't get it from category
+      if (!item.metadata.equipment && details.metadata?.equipment) {
+        item.metadata.equipment = details.metadata.equipment;
+      }
+    }
+  }
+
+  clearProgress();
+  return [...itemsMap.values()];
+}
+
 // ============ Database Functions ============
 
 async function clearCategory(categorySlug: string): Promise<void> {
@@ -1549,6 +1711,7 @@ async function main() {
     artifacts: scrapeArtifacts,
     gems: scrapeGems,
     forageables: scrapeForageables,
+    "artisan-products": scrapeArtisanProducts,
     // Note: lake-temple is now handled via migration, not scraper
   };
 

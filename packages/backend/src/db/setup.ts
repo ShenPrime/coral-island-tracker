@@ -95,7 +95,8 @@ async function setupDatabase() {
         ('Gems', 'gems', 'Minerals and gems from mining', 'gem', 6),
         ('Forageables', 'forageables', 'Foraged items from land and ocean including mushrooms, flowers, shells, and more', 'leaf', 7),
         ('Cooking', 'cooking', 'Recipes and cooked dishes', 'utensils', 8),
-        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 9)
+        ('NPCs', 'npcs', 'Town residents and relationship tracking', 'users', 9),
+        ('Artisan Products', 'artisan-products', 'Processed goods from artisan equipment', 'flask', 10)
     `;
 
     // Create a default save slot
