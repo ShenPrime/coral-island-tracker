@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Category, Season, TimeOfDay } from "@coral-tracker/shared";
+import type { Category, Season, TimeOfDay, Rarity } from "@coral-tracker/shared";
 
 interface AppState {
   // Current save slot
@@ -27,6 +27,10 @@ interface AppState {
   toggleLocation: (location: string) => void;
   clearLocations: () => void;
 
+  selectedRarities: Rarity[];
+  toggleRarity: (rarity: Rarity) => void;
+  clearRarities: () => void;
+
   showCompleted: boolean | null; // null = show all, true = completed only, false = incomplete only
   setShowCompleted: (show: boolean | null) => void;
 
@@ -38,6 +42,9 @@ interface AppState {
   // UI state
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleSidebarCollapsed: () => void;
 }
 
 export const useStore = create<AppState>()(
@@ -82,6 +89,15 @@ export const useStore = create<AppState>()(
         })),
       clearLocations: () => set({ selectedLocations: [] }),
 
+      selectedRarities: [],
+      toggleRarity: (rarity) =>
+        set((state) => ({
+          selectedRarities: state.selectedRarities.includes(rarity)
+            ? state.selectedRarities.filter((r) => r !== rarity)
+            : [...state.selectedRarities, rarity],
+        })),
+      clearRarities: () => set({ selectedRarities: [] }),
+
       showCompleted: null,
       setShowCompleted: (show) => set({ showCompleted: show }),
 
@@ -94,18 +110,24 @@ export const useStore = create<AppState>()(
           selectedSeasons: [],
           selectedTimes: [],
           selectedLocations: [],
+          selectedRarities: [],
           showCompleted: null,
         }),
 
       // UI
       sidebarOpen: true,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      toggleSidebarCollapsed: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
     }),
     {
       name: "coral-tracker-storage",
       partialize: (state) => ({
         currentSaveId: state.currentSaveId,
         sidebarOpen: state.sidebarOpen,
+        sidebarCollapsed: state.sidebarCollapsed,
+        selectedSeasons: state.selectedSeasons,
       }),
     }
   )

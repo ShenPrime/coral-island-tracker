@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
-import { SEASONS, TIMES_OF_DAY, type Season, type TimeOfDay } from "@coral-tracker/shared";
+import { SEASONS, TIMES_OF_DAY, type Season, type TimeOfDay, type Rarity } from "@coral-tracker/shared";
+
+// Format rarity for display (super_rare -> "Super Rare")
+const formatRarity = (rarity: string) => 
+  rarity.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
 interface SearchAutocompleteProps {
   items: Array<{ id: number; name: string }>;
@@ -389,11 +393,12 @@ function SingleSelectDropdown({
 
 interface FilterBarProps {
   availableLocations?: string[];
+  availableRarities?: Rarity[];
   items?: Array<{ id: number; name: string }>;
   locationLabel?: string;
 }
 
-export function FilterBar({ availableLocations = [], items = [], locationLabel = "Location" }: FilterBarProps) {
+export function FilterBar({ availableLocations = [], availableRarities = [], items = [], locationLabel = "Location" }: FilterBarProps) {
   const {
     searchQuery,
     setSearchQuery,
@@ -403,6 +408,8 @@ export function FilterBar({ availableLocations = [], items = [], locationLabel =
     toggleTime,
     selectedLocations,
     toggleLocation,
+    selectedRarities,
+    toggleRarity,
     showCompleted,
     setShowCompleted,
     clearAllFilters,
@@ -413,6 +420,7 @@ export function FilterBar({ availableLocations = [], items = [], locationLabel =
     selectedSeasons.length > 0 || 
     selectedTimes.length > 0 || 
     selectedLocations.length > 0 || 
+    selectedRarities.length > 0 ||
     showCompleted !== null;
 
   return (
@@ -460,6 +468,17 @@ export function FilterBar({ availableLocations = [], items = [], locationLabel =
             selected={selectedLocations}
             onToggle={toggleLocation}
             formatOption={(o) => o}
+          />
+        )}
+
+        {/* Rarity filter */}
+        {availableRarities.length > 0 && (
+          <MultiSelectDropdown
+            label="Rarity"
+            options={availableRarities}
+            selected={selectedRarities}
+            onToggle={(r) => toggleRarity(r as Rarity)}
+            formatOption={formatRarity}
           />
         )}
 

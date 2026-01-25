@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "@/store/useStore";
+import { SEASONS, type Season } from "@coral-tracker/shared";
 import {
   Fish,
   Bug,
@@ -16,7 +18,83 @@ import {
   Save,
   Leaf,
   Sun,
+  Flower2,
+  Snowflake,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
+
+// Tooltip component for collapsed sidebar - uses portal to escape overflow:hidden
+interface TooltipProps {
+  children: React.ReactNode;
+  content: string;
+  enabled?: boolean;
+}
+
+function Tooltip({ children, content, enabled = true }: TooltipProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.right + 12,
+      });
+    }
+    setIsHovered(true);
+    // Small delay to ensure position is set before animation starts
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setIsVisible(false);
+  };
+
+  if (!enabled) return <>{children}</>;
+  
+  return (
+    <div 
+      ref={triggerRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {children}
+      {isHovered && position && createPortal(
+        <div 
+          className={`
+            fixed -translate-y-1/2
+            px-3 py-1.5 rounded-lg
+            bg-deepsea-700 border border-ocean-600/50
+            text-white text-sm font-medium whitespace-nowrap
+            shadow-lg shadow-black/30
+            transition-all duration-150 ease-out z-[100]
+            pointer-events-none
+          `}
+          style={{ 
+            top: position.top, 
+            left: position.left,
+            opacity: isVisible ? 1 : 0,
+            transform: `translateY(-50%) translateX(${isVisible ? '0' : '-8px'})`,
+          }}
+        >
+          {content}
+          {/* Arrow pointing left */}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent border-r-8 border-r-deepsea-700" />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 const categoryIcons: Record<string, React.ReactNode> = {
   fish: <Fish size={20} />,
@@ -30,24 +108,54 @@ const categoryIcons: Record<string, React.ReactNode> = {
   npcs: <Users size={20} />,
 };
 
+const seasonConfig: Record<Season, { label: string; icon: React.ReactNode; colors: string; activeColors: string }> = {
+  spring: {
+    label: "Spr",
+    icon: <Flower2 size={16} />,
+    colors: "text-pink-400/70 hover:text-pink-300 hover:bg-pink-500/20",
+    activeColors: "bg-pink-500/30 text-pink-200 border-pink-400/50 shadow-lg shadow-pink-500/20",
+  },
+  summer: {
+    label: "Sum",
+    icon: <Sun size={16} />,
+    colors: "text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/20",
+    activeColors: "bg-amber-500/30 text-amber-200 border-amber-400/50 shadow-lg shadow-amber-500/20",
+  },
+  fall: {
+    label: "Fall",
+    icon: <Leaf size={16} />,
+    colors: "text-orange-400/70 hover:text-orange-300 hover:bg-orange-500/20",
+    activeColors: "bg-orange-500/30 text-orange-200 border-orange-400/50 shadow-lg shadow-orange-500/20",
+  },
+  winter: {
+    label: "Win",
+    icon: <Snowflake size={16} />,
+    colors: "text-cyan-400/70 hover:text-cyan-300 hover:bg-cyan-500/20",
+    activeColors: "bg-cyan-500/30 text-cyan-200 border-cyan-400/50 shadow-lg shadow-cyan-500/20",
+  },
+};
+
 interface NavItemProps {
   to: string;
   isActive: boolean;
   onClick?: () => void;
   children: React.ReactNode;
   registerRef?: (el: HTMLAnchorElement | null) => void;
+  collapsed?: boolean;
+  title?: string;
 }
 
-function NavItem({ to, isActive, onClick, children, registerRef }: NavItemProps) {
-  return (
+function NavItem({ to, isActive, onClick, children, registerRef, collapsed, title }: NavItemProps) {
+  const link = (
     <Link
       ref={registerRef}
       to={to}
       onClick={onClick}
       className={`
-        nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg
+        nav-item flex items-center rounded-lg
         transform-gpu transition-all duration-200
         hover:-translate-y-0.5
+        ${collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-4 py-2.5"}
         ${isActive 
           ? "text-white" 
           : "text-slate-300 hover:text-white"
@@ -57,6 +165,12 @@ function NavItem({ to, isActive, onClick, children, registerRef }: NavItemProps)
       {children}
     </Link>
   );
+
+  return (
+    <Tooltip content={title || ""} enabled={collapsed && !!title}>
+      {link}
+    </Tooltip>
+  );
 }
 
 interface LayoutProps {
@@ -65,31 +179,37 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { categories, sidebarOpen, setSidebarOpen, setSelectedCategory } =
+  const { categories, sidebarOpen, setSidebarOpen, sidebarCollapsed, toggleSidebarCollapsed, setSelectedCategory, selectedSeasons, toggleSeason } =
     useStore();
   
   const navRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
   const navContainerRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ top: 0, height: 0, opacity: 0 });
 
-  // Update indicator position when route changes
+  // Update indicator position when route changes or sidebar collapses
   useEffect(() => {
-    const activeEl = navRefs.current.get(location.pathname);
-    const container = navContainerRef.current;
+    // Hide indicator immediately during transition
+    setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
     
-    if (activeEl && container) {
-      const containerRect = container.getBoundingClientRect();
-      const activeRect = activeEl.getBoundingClientRect();
+    // Recalculate after sidebar transition completes
+    const timer = setTimeout(() => {
+      const activeEl = navRefs.current.get(location.pathname);
+      const container = navContainerRef.current;
       
-      setIndicatorStyle({
-        top: activeRect.top - containerRect.top,
-        height: activeRect.height,
-        opacity: 1,
-      });
-    } else {
-      setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
-    }
-  }, [location.pathname, categories]);
+      if (activeEl && container) {
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        
+        setIndicatorStyle({
+          top: activeRect.top - containerRect.top,
+          height: activeRect.height,
+          opacity: 1,
+        });
+      }
+    }, 310); // Wait for 300ms sidebar transition + small buffer
+    
+    return () => clearTimeout(timer);
+  }, [location.pathname, categories, sidebarCollapsed]);
 
   const registerRef = (path: string) => (el: HTMLAnchorElement | null) => {
     if (el) {
@@ -121,23 +241,61 @@ export function Layout({ children }: LayoutProps) {
       <aside
         className={`
           fixed inset-y-0 left-0 z-40
-          w-64 bg-gradient-to-b from-deepsea-800 to-deepsea-900 shadow-xl
+          bg-gradient-to-b from-deepsea-800 to-deepsea-900 shadow-xl
           border-r border-ocean-800/30
-          transform transition-transform duration-200
+          transform transition-all duration-300 ease-in-out
           lg:sticky lg:top-0 lg:h-screen
+          ${sidebarCollapsed ? "lg:w-16" : "w-64"}
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        <div className="p-6 h-full overflow-y-auto">
-          <Link to="/" className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-coral-400 to-coral-600 rounded-xl flex items-center justify-center shadow-lg shadow-coral-500/30">
+        <div className={`h-full overflow-y-auto overflow-x-hidden ${sidebarCollapsed ? "p-2" : "p-6"}`}>
+          {/* Logo */}
+          <Link to="/" className={`flex items-center mb-6 ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
+            <div className={`bg-gradient-to-br from-coral-400 to-coral-600 rounded-xl flex items-center justify-center shadow-lg shadow-coral-500/30 flex-shrink-0 ${sidebarCollapsed ? "w-10 h-10" : "w-10 h-10"}`}>
               <Fish className="text-white" size={24} />
             </div>
-            <div>
-              <h1 className="font-bold text-lg text-white">Coral Island</h1>
-              <p className="text-xs text-ocean-300">Tracker</p>
-            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <h1 className="font-bold text-lg text-white">Coral Island</h1>
+                <p className="text-xs text-ocean-300">Tracker</p>
+              </div>
+            )}
           </Link>
+
+          {/* Season Selector */}
+          <div className="mb-6">
+            <div className={`flex ${sidebarCollapsed ? "flex-col gap-1" : "gap-1.5"}`}>
+              {SEASONS.map((season) => {
+                const config = seasonConfig[season];
+                const isActive = selectedSeasons.includes(season);
+                const seasonName = season.charAt(0).toUpperCase() + season.slice(1);
+                const button = (
+                  <button
+                    key={season}
+                    onClick={() => toggleSeason(season)}
+                    className={`
+                      flex flex-col items-center gap-0.5 rounded-lg
+                      border transition-all duration-200 transform-gpu
+                      ${sidebarCollapsed ? "py-2 px-2" : "flex-1 py-2 px-1"}
+                      ${isActive 
+                        ? config.activeColors 
+                        : `border-transparent ${config.colors}`
+                      }
+                    `}
+                  >
+                    {config.icon}
+                    {!sidebarCollapsed && <span className="text-[10px] font-medium">{config.label}</span>}
+                  </button>
+                );
+                return (
+                  <Tooltip key={season} content={seasonName} enabled={sidebarCollapsed}>
+                    {button}
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Navigation with sliding indicator */}
           <div ref={navContainerRef} className="relative">
@@ -160,35 +318,44 @@ export function Layout({ children }: LayoutProps) {
                 to="/" 
                 isActive={location.pathname === "/"}
                 registerRef={registerRef("/")}
+                collapsed={sidebarCollapsed}
+                title="Dashboard"
               >
                 <Home size={20} />
-                <span>Dashboard</span>
+                {!sidebarCollapsed && <span>Dashboard</span>}
               </NavItem>
 
               <NavItem 
                 to="/saves" 
                 isActive={location.pathname === "/saves"}
                 registerRef={registerRef("/saves")}
+                collapsed={sidebarCollapsed}
+                title="Save Slots"
               >
                 <Save size={20} />
-                <span>Save Slots</span>
+                {!sidebarCollapsed && <span>Save Slots</span>}
               </NavItem>
 
               <NavItem 
                 to="/temple" 
                 isActive={location.pathname.startsWith("/temple")}
                 registerRef={registerRef("/temple")}
+                collapsed={sidebarCollapsed}
+                title="Lake Temple"
               >
                 <Sun size={20} />
-                <span>Lake Temple</span>
+                {!sidebarCollapsed && <span>Lake Temple</span>}
               </NavItem>
             </nav>
 
             {/* Categories */}
             <div className="mt-8">
-              <h2 className="text-xs font-semibold text-ocean-400 uppercase tracking-wider mb-3">
-                Categories
-              </h2>
+              {!sidebarCollapsed && (
+                <h2 className="text-xs font-semibold text-ocean-400 uppercase tracking-wider mb-3">
+                  Categories
+                </h2>
+              )}
+              {sidebarCollapsed && <div className="border-t border-ocean-700/30 mb-3" />}
               <nav className="space-y-1 relative">
                 {categories.map((category) => (
                   <NavItem
@@ -197,14 +364,25 @@ export function Layout({ children }: LayoutProps) {
                     isActive={location.pathname === `/track/${category.slug}`}
                     onClick={() => setSelectedCategory(category.slug)}
                     registerRef={registerRef(`/track/${category.slug}`)}
+                    collapsed={sidebarCollapsed}
+                    title={category.name}
                   >
                     {categoryIcons[category.slug] || <Scroll size={20} />}
-                    <span>{category.name}</span>
+                    {!sidebarCollapsed && <span>{category.name}</span>}
                   </NavItem>
                 ))}
               </nav>
             </div>
           </div>
+
+          {/* Collapse Toggle Button - Desktop only */}
+          <button
+            onClick={toggleSidebarCollapsed}
+            className="hidden lg:flex absolute bottom-4 right-0 translate-x-1/2 w-6 h-6 bg-deepsea-700 border border-ocean-600/50 rounded-full items-center justify-center text-ocean-300 hover:text-white hover:bg-deepsea-600 transition-colors shadow-lg"
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+          </button>
         </div>
       </aside>
 

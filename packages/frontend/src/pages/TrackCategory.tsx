@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
@@ -6,21 +6,33 @@ import { ItemCard } from "@/components/ItemCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
-import { FISHING_LOCATIONS, FORAGING_LOCATIONS } from "@coral-tracker/shared";
-import type { Item, Category, ItemTempleStatus } from "@coral-tracker/shared";
+import { FISHING_LOCATIONS, FORAGING_LOCATIONS, RARITIES } from "@coral-tracker/shared";
+import type { Item, Category, ItemTempleStatus, Rarity } from "@coral-tracker/shared";
 
 type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
+
+// Categories that support time-of-day filtering
+const CATEGORIES_WITH_TIME = ["fish", "insects", "critters"];
 
 export function TrackCategory() {
   const { slug } = useParams<{ slug: string }>();
   const { 
     currentSaveId, 
     searchQuery, 
+    setSearchQuery,
     selectedSeasons, 
     selectedTimes,
+    clearTimes,
     selectedLocations,
-    showCompleted 
+    clearLocations,
+    selectedRarities,
+    clearRarities,
+    showCompleted,
+    setShowCompleted,
   } = useStore();
+
+  // Track previous slug to detect category changes
+  const prevSlugRef = useRef<string | undefined>(undefined);
 
   const [items, setItems] = useState<ItemWithProgress[]>([]);
   const [category, setCategory] = useState<(Category & { item_count: number }) | null>(null);
@@ -33,7 +45,7 @@ export function TrackCategory() {
     setLoading(true);
     try {
       const [itemsData, categoryData] = await Promise.all([
-        getProgressItems(currentSaveId, slug, showCompleted ?? undefined),
+        getProgressItems(currentSaveId, slug),
         getCategory(slug),
       ]);
       setItems(itemsData);
@@ -50,11 +62,36 @@ export function TrackCategory() {
     } finally {
       setLoading(false);
     }
-  }, [currentSaveId, slug, showCompleted]);
+  }, [currentSaveId, slug]);
 
   useEffect(() => {
     loadItems();
   }, [loadItems]);
+
+  // Clear category-specific filters when switching categories
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevSlugRef.current === undefined) {
+      prevSlugRef.current = slug;
+      return;
+    }
+
+    // Only clear if slug actually changed
+    if (prevSlugRef.current !== slug) {
+      // Always clear these (category-specific)
+      clearLocations();
+      clearRarities();
+      setSearchQuery("");
+      setShowCompleted(null);
+
+      // Clear time filter only if new category doesn't support time-based filtering
+      if (slug && !CATEGORIES_WITH_TIME.includes(slug)) {
+        clearTimes();
+      }
+
+      prevSlugRef.current = slug;
+    }
+  }, [slug, clearLocations, clearRarities, setSearchQuery, setShowCompleted, clearTimes]);
 
   const handleToggle = async (itemId: number, completed: boolean) => {
     if (!currentSaveId) return;
@@ -115,6 +152,16 @@ export function TrackCategory() {
     slug === "forageables" ? [...FORAGING_LOCATIONS] : 
     [];
 
+  // Get available rarities from items in this category (in standard order)
+  const availableRarities = useMemo(() => {
+    const raritiesInCategory = new Set<Rarity>();
+    items.forEach(item => {
+      if (item.rarity) raritiesInCategory.add(item.rarity);
+    });
+    // Return in standard order: common, uncommon, rare, super_rare, epic, legendary
+    return RARITIES.filter(r => raritiesInCategory.has(r));
+  }, [items]);
+
   // Filter items based on all filters
   const filteredItems = items.filter((item) => {
     // Search filter
@@ -153,6 +200,19 @@ export function TrackCategory() {
       if (!hasMatch) {
         return false;
       }
+    }
+
+    // Rarity filter (match ANY selected rarity)
+    if (selectedRarities.length > 0) {
+      if (!item.rarity || !selectedRarities.includes(item.rarity)) {
+        return false;
+      }
+    }
+
+    // Completion filter
+    if (showCompleted !== null) {
+      if (showCompleted && !item.completed) return false;
+      if (!showCompleted && item.completed) return false;
     }
 
     return true;
@@ -215,7 +275,8 @@ export function TrackCategory() {
 
       {/* Filters */}
       <FilterBar 
-        availableLocations={availableLocations} 
+        availableLocations={availableLocations}
+        availableRarities={availableRarities}
         items={items} 
       />
 

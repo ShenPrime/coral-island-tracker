@@ -20,6 +20,40 @@ const rarityColors: Record<Rarity, string> = {
   legendary: "bg-gradient-to-r from-sand-500/40 to-coral-500/40 text-sand-200 border border-sand-400/50",
 };
 
+// Rarity-based card border and glow styles
+const rarityCardStyles: Record<Rarity, { border: string; glow: string; glowCompleted: string }> = {
+  common: {
+    border: "border-l-4 border-l-slate-500",
+    glow: "shadow-[0_0_15px_-3px_rgba(100,116,139,0.3)]",
+    glowCompleted: "shadow-[0_0_10px_-3px_rgba(100,116,139,0.15)]",
+  },
+  uncommon: {
+    border: "border-l-4 border-l-emerald-500",
+    glow: "shadow-[0_0_15px_-3px_rgba(16,185,129,0.35)]",
+    glowCompleted: "shadow-[0_0_10px_-3px_rgba(16,185,129,0.2)]",
+  },
+  rare: {
+    border: "border-l-4 border-l-ocean-400",
+    glow: "shadow-[0_0_15px_-3px_rgba(0,201,196,0.4)]",
+    glowCompleted: "shadow-[0_0_10px_-3px_rgba(0,201,196,0.2)]",
+  },
+  super_rare: {
+    border: "border-l-4 border-l-indigo-400",
+    glow: "shadow-[0_0_15px_-3px_rgba(129,140,248,0.4)]",
+    glowCompleted: "shadow-[0_0_10px_-3px_rgba(129,140,248,0.2)]",
+  },
+  epic: {
+    border: "border-l-4 border-l-purple-400",
+    glow: "shadow-[0_0_18px_-3px_rgba(192,132,252,0.45)]",
+    glowCompleted: "shadow-[0_0_12px_-3px_rgba(192,132,252,0.25)]",
+  },
+  legendary: {
+    border: "border-l-4 border-l-amber-400",
+    glow: "shadow-[0_0_20px_-3px_rgba(251,191,36,0.5)]",
+    glowCompleted: "shadow-[0_0_12px_-3px_rgba(251,191,36,0.25)]",
+  },
+};
+
 const seasonColors: Record<Season, string> = {
   spring: "bg-pink-500/30 text-pink-300 border border-pink-400/30",
   summer: "bg-sand-500/30 text-sand-300 border border-sand-400/30",
@@ -72,6 +106,9 @@ export function ItemCard({ item, onToggle, showDetails = true, templeStatus, onT
     setShowModal(true);
   };
 
+  // Get rarity styles if item has rarity
+  const rarityStyle = item.rarity ? rarityCardStyles[item.rarity] : null;
+
   return (
     <>
       <div
@@ -84,6 +121,8 @@ export function ItemCard({ item, onToggle, showDetails = true, templeStatus, onT
             : ""
           }
           ${justCompleted ? "animate-card-complete" : ""}
+          ${rarityStyle ? rarityStyle.border : ""}
+          ${rarityStyle ? (item.completed ? rarityStyle.glowCompleted : rarityStyle.glow) : ""}
         `}
         onClick={handleClick}
       >

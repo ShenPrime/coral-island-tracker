@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { X, ImageIcon, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unlock, Tag, Check, Sparkles, Clock, Cloud, MapPin, Gift, Package, Sun } from "lucide-react";
 import type { Item, Season, Rarity } from "@coral-tracker/shared";
 
@@ -50,7 +51,7 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
     onToggle?.(item.id, !item.completed);
   };
 
-  return (
+  return createPortal(
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
@@ -60,7 +61,7 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
       
       {/* Modal */}
       <div 
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-deepsea-800 border border-ocean-700/50 rounded-2xl shadow-2xl modal-content"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-deepsea-800/95 border border-ocean-700/50 rounded-2xl shadow-2xl modal-content"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -416,6 +417,7 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
