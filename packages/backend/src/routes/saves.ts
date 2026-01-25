@@ -1,11 +1,17 @@
 import { Hono } from "hono";
 import { sql } from "../db";
+import { requireSession } from "../middleware/session";
 import type { SaveSlot, CreateSaveSlotRequest, CategoryStats } from "@coral-tracker/shared";
 
 const app = new Hono();
 
-// GET /api/saves - List all save slots with stats
+// Apply session middleware to all routes
+app.use("*", requireSession);
+
+// GET /api/saves - List all save slots for this session
 app.get("/", async (c) => {
+  const session = c.get("session");
+
   const saves = await sql`
     SELECT 
       s.*,
@@ -13,6 +19,7 @@ app.get("/", async (c) => {
       (SELECT COUNT(*)::int FROM items) as total_items
     FROM save_slots s
     LEFT JOIN progress p ON p.save_slot_id = s.id
+    WHERE s.session_id = ${session.id}
     GROUP BY s.id
     ORDER BY s.updated_at DESC
   `;
@@ -32,8 +39,9 @@ app.get("/", async (c) => {
   return c.json({ data: savesWithStats, success: true });
 });
 
-// POST /api/saves - Create new save slot
+// POST /api/saves - Create new save slot for this session
 app.post("/", async (c) => {
+  const session = c.get("session");
   const body = await c.req.json<CreateSaveSlotRequest>();
 
   if (!body.name || body.name.trim().length === 0) {
@@ -44,21 +52,22 @@ app.post("/", async (c) => {
   }
 
   const result = await sql`
-    INSERT INTO save_slots (name)
-    VALUES (${body.name.trim()})
+    INSERT INTO save_slots (name, session_id)
+    VALUES (${body.name.trim()}, ${session.id})
     RETURNING *
   `;
 
   return c.json({ data: result[0], success: true }, 201);
 });
 
-// GET /api/saves/:id - Get save slot with full progress
+// GET /api/saves/:id - Get save slot with full progress (only if owned by session)
 app.get("/:id", async (c) => {
+  const session = c.get("session");
   const id = Number(c.req.param("id"));
 
-  // Get save slot
+  // Get save slot (only if belongs to this session)
   const saveResult = await sql`
-    SELECT * FROM save_slots WHERE id = ${id}
+    SELECT * FROM save_slots WHERE id = ${id} AND session_id = ${session.id}
   `;
 
   if (saveResult.length === 0) {
@@ -105,12 +114,13 @@ app.get("/:id", async (c) => {
   });
 });
 
-// DELETE /api/saves/:id - Delete save slot
+// DELETE /api/saves/:id - Delete save slot (only if owned by session)
 app.delete("/:id", async (c) => {
+  const session = c.get("session");
   const id = Number(c.req.param("id"));
 
   const result = await sql`
-    DELETE FROM save_slots WHERE id = ${id} RETURNING id
+    DELETE FROM save_slots WHERE id = ${id} AND session_id = ${session.id} RETURNING id
   `;
 
   if (result.length === 0) {
@@ -120,8 +130,9 @@ app.delete("/:id", async (c) => {
   return c.json({ data: { id }, success: true });
 });
 
-// PATCH /api/saves/:id - Update save slot name
+// PATCH /api/saves/:id - Update save slot name (only if owned by session)
 app.patch("/:id", async (c) => {
+  const session = c.get("session");
   const id = Number(c.req.param("id"));
   const body = await c.req.json<{ name: string }>();
 
@@ -135,7 +146,7 @@ app.patch("/:id", async (c) => {
   const result = await sql`
     UPDATE save_slots 
     SET name = ${body.name.trim()}, updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND session_id = ${session.id}
     RETURNING *
   `;
 

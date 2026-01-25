@@ -1,13 +1,33 @@
 import { Hono } from "hono";
 import { sql } from "../db";
+import { requireSession } from "../middleware/session";
 import type { UpdateProgressRequest, BulkUpdateProgressRequest } from "@coral-tracker/shared";
 
 const app = new Hono();
 
+// Apply session middleware to all routes
+app.use("*", requireSession);
+
+/**
+ * Helper to verify save slot belongs to session
+ */
+async function verifySaveOwnership(saveId: number, sessionId: string): Promise<boolean> {
+  const result = await sql`
+    SELECT id FROM save_slots WHERE id = ${saveId} AND session_id = ${sessionId}
+  `;
+  return result.length > 0;
+}
+
 // GET /api/progress/:saveId - Get all progress for a save slot
 app.get("/:saveId", async (c) => {
+  const session = c.get("session");
   const saveId = Number(c.req.param("saveId"));
   const category = c.req.query("category");
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(saveId, session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+  }
 
   let progress;
   if (category) {
@@ -58,9 +78,15 @@ app.get("/:saveId", async (c) => {
 
 // GET /api/progress/:saveId/items - Get items with progress status for a save slot
 app.get("/:saveId/items", async (c) => {
+  const session = c.get("session");
   const saveId = Number(c.req.param("saveId"));
   const category = c.req.query("category");
   const completed = c.req.query("completed"); // "true", "false", or undefined for all
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(saveId, session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+  }
 
   let items;
   if (category) {
@@ -104,13 +130,13 @@ app.get("/:saveId/items", async (c) => {
 
 // PUT /api/progress/:saveId/:itemId - Update single item progress
 app.put("/:saveId/:itemId", async (c) => {
+  const session = c.get("session");
   const saveId = Number(c.req.param("saveId"));
   const itemId = Number(c.req.param("itemId"));
   const body = await c.req.json<UpdateProgressRequest>();
 
-  // Check if save slot exists
-  const saveExists = await sql`SELECT id FROM save_slots WHERE id = ${saveId}`;
-  if (saveExists.length === 0) {
+  // Verify ownership
+  if (!(await verifySaveOwnership(saveId, session.id))) {
     return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
@@ -144,6 +170,7 @@ app.put("/:saveId/:itemId", async (c) => {
 
 // POST /api/progress/:saveId/bulk - Bulk update progress
 app.post("/:saveId/bulk", async (c) => {
+  const session = c.get("session");
   const saveId = Number(c.req.param("saveId"));
   const body = await c.req.json<BulkUpdateProgressRequest>();
 
@@ -154,9 +181,8 @@ app.post("/:saveId/bulk", async (c) => {
     );
   }
 
-  // Check if save slot exists
-  const saveExists = await sql`SELECT id FROM save_slots WHERE id = ${saveId}`;
-  if (saveExists.length === 0) {
+  // Verify ownership
+  if (!(await verifySaveOwnership(saveId, session.id))) {
     return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 

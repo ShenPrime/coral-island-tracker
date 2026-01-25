@@ -11,13 +11,30 @@ import type {
   AltarWithOfferings,
   ItemTempleStatus,
 } from "@coral-tracker/shared";
+import { getSessionId } from "./session";
 
 const API_BASE = "/api";
+
+/**
+ * Get headers with session ID included
+ */
+function getHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  const sessionId = getSessionId();
+  if (sessionId) {
+    headers["X-Session-ID"] = sessionId;
+  }
+
+  return headers;
+}
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
-      "Content-Type": "application/json",
+      ...getHeaders(),
       ...options?.headers,
     },
     ...options,
@@ -26,13 +43,21 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   const data = await response.json();
 
   if (!response.ok) {
+    // Handle rate limiting
+    if (response.status === 429) {
+      throw new Error(data.message || "Too many requests. Please wait a moment.");
+    }
+    // Handle auth errors
+    if (response.status === 401) {
+      throw new Error(data.message || "Session expired. Please refresh the page.");
+    }
     throw new Error(data.message || "API request failed");
   }
 
   return data.data;
 }
 
-// Categories
+// Categories (public - no session required but we send it anyway)
 export async function getCategories(): Promise<Category[]> {
   return fetchApi<Category[]>("/categories");
 }
@@ -41,7 +66,7 @@ export async function getCategory(slug: string): Promise<Category & { item_count
   return fetchApi<Category & { item_count: number }>(`/categories/${slug}`);
 }
 
-// Items
+// Items (public - no session required but we send it anyway)
 export async function getItems(params?: ItemsQueryParams): Promise<{
   items: Item[];
   total: number;
@@ -55,7 +80,9 @@ export async function getItems(params?: ItemsQueryParams): Promise<{
     });
   }
   const query = searchParams.toString();
-  const response = await fetch(`${API_BASE}/items${query ? `?${query}` : ""}`);
+  const response = await fetch(`${API_BASE}/items${query ? `?${query}` : ""}`, {
+    headers: getHeaders(),
+  });
   const data = await response.json();
   return { items: data.data, total: data.total };
 }
@@ -64,7 +91,7 @@ export async function getItem(id: number): Promise<Item> {
   return fetchApi<Item>(`/items/${id}`);
 }
 
-// Save Slots
+// Save Slots (protected - requires session)
 export async function getSaveSlots(): Promise<SaveSlot[]> {
   return fetchApi<SaveSlot[]>("/saves");
 }
@@ -91,7 +118,7 @@ export async function updateSaveSlot(id: number, name: string): Promise<SaveSlot
   });
 }
 
-// Progress
+// Progress (protected - requires session)
 export async function getProgressItems(
   saveId: number,
   category?: string,
@@ -125,7 +152,7 @@ export async function bulkUpdateProgress(
   });
 }
 
-// Temple
+// Temple (protected - requires session)
 export async function getTempleOverview(saveId: number): Promise<TempleOverview> {
   return fetchApi<TempleOverview>(`/temple/altars?saveId=${saveId}`);
 }

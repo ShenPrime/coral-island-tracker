@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { sql } from "../db";
+import { requireSession } from "../middleware/session";
 import type {
   AltarSummary,
   AltarWithOfferings,
@@ -11,15 +12,34 @@ import type {
 
 const templeRouter = new Hono();
 
+// Apply session middleware to all routes
+templeRouter.use("*", requireSession);
+
+/**
+ * Helper to verify save slot belongs to session
+ */
+async function verifySaveOwnership(saveId: number, sessionId: string): Promise<boolean> {
+  const result = await sql`
+    SELECT id FROM save_slots WHERE id = ${saveId} AND session_id = ${sessionId}
+  `;
+  return result.length > 0;
+}
+
 /**
  * GET /api/temple/altars
  * Get temple overview with all altars and their progress
  */
 templeRouter.get("/altars", async (c) => {
+  const session = c.get("session");
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
     return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+  }
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(Number(saveId), session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
   try {
@@ -111,11 +131,17 @@ templeRouter.get("/altars", async (c) => {
  * Get detailed altar data with offerings and items
  */
 templeRouter.get("/altars/:altarSlug", async (c) => {
+  const session = c.get("session");
   const { altarSlug } = c.req.param();
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
     return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+  }
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(Number(saveId), session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
   try {
@@ -283,12 +309,18 @@ templeRouter.get("/altars/:altarSlug", async (c) => {
  * Update temple progress (offered status)
  */
 templeRouter.put("/progress/:requirementId", async (c) => {
+  const session = c.get("session");
   const { requirementId } = c.req.param();
   const saveId = c.req.query("saveId");
   const body = await c.req.json();
 
   if (!saveId) {
     return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+  }
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(Number(saveId), session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
   const { offered } = body;
@@ -320,11 +352,17 @@ templeRouter.put("/progress/:requirementId", async (c) => {
  * Check if an item is required for temple offerings
  */
 templeRouter.get("/item/:itemId", async (c) => {
+  const session = c.get("session");
   const { itemId } = c.req.param();
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
     return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+  }
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(Number(saveId), session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
   try {
@@ -366,11 +404,17 @@ templeRouter.get("/item/:itemId", async (c) => {
  * Batch check multiple items for temple requirement status
  */
 templeRouter.get("/items-status", async (c) => {
+  const session = c.get("session");
   const saveId = c.req.query("saveId");
   const itemIds = c.req.query("itemIds");
 
   if (!saveId) {
     return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+  }
+
+  // Verify ownership
+  if (!(await verifySaveOwnership(Number(saveId), session.id))) {
+    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
   }
 
   if (!itemIds) {

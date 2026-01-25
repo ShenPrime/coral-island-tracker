@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "hono/bun";
 import { checkConnection } from "./db";
 import categoriesRouter from "./routes/categories";
@@ -8,6 +9,8 @@ import itemsRouter from "./routes/items";
 import savesRouter from "./routes/saves";
 import progressRouter from "./routes/progress";
 import templeRouter from "./routes/temple";
+import sessionRouter from "./routes/session";
+import { rateLimit } from "./middleware/rateLimit";
 import path from "path";
 
 const app = new Hono();
@@ -17,6 +20,12 @@ const frontendDist = path.join(import.meta.dir, "../../frontend/dist");
 
 // Middleware
 app.use("*", logger());
+
+// Secure headers (XSS protection, clickjacking prevention, etc.)
+app.use("*", secureHeaders());
+
+// Rate limiting - apply to all API routes
+app.use("/api/*", rateLimit);
 
 // CORS - allow origins from env var, or allow all if not set
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["*"];
@@ -31,11 +40,11 @@ app.use(
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Session-ID"],
   })
 );
 
-// Health check
+// Health check (public, no auth required)
 app.get("/health", async (c) => {
   const dbConnected = await checkConnection();
   return c.json({
@@ -46,8 +55,12 @@ app.get("/health", async (c) => {
 });
 
 // API Routes
+// Public routes (no session required)
+app.route("/api/session", sessionRouter);
 app.route("/api/categories", categoriesRouter);
 app.route("/api/items", itemsRouter);
+
+// Protected routes (session required - handled by middleware in each router)
 app.route("/api/saves", savesRouter);
 app.route("/api/progress", progressRouter);
 app.route("/api/temple", templeRouter);
@@ -86,6 +99,7 @@ console.log(`
   ====================
   Server running at http://localhost:${port}
   Frontend served from: ${frontendDist}
+  Rate limiting: 100 requests/minute per session
 `);
 
 export default {
