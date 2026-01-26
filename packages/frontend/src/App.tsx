@@ -8,6 +8,7 @@ import { LakeTempleOverview } from "@/pages/LakeTempleOverview";
 import { AltarDetail } from "@/pages/AltarDetail";
 import { KeyboardShortcutsPanel } from "@/components/KeyboardShortcutsPanel";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { NewVersionBanner } from "@/components/NewVersionBanner";
 import { KeyboardNavigationProvider } from "@/context/KeyboardNavigationContext";
 import { useStore } from "@/store/useStore";
 import { initSession } from "@/lib/session";
@@ -85,6 +86,7 @@ function App() {
     <KeyboardNavigationProvider>
       <div className="flex flex-col min-h-screen">
         <OfflineBanner />
+        <NewVersionBanner />
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />

@@ -19,8 +19,17 @@ const app = new Hono();
 // Path to frontend build directory
 const frontendDist = path.join(import.meta.dir, "../../frontend/dist");
 
+// Build ID for version checking - Railway provides RAILWAY_DEPLOYMENT_ID automatically
+const BUILD_ID = process.env.RAILWAY_DEPLOYMENT_ID || process.env.BUILD_ID || "dev";
+
 // Middleware
 app.use("*", logger());
+
+// Add build ID to all responses for client version checking
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Build-ID", BUILD_ID);
+});
 
 // Secure headers (XSS protection, clickjacking prevention, etc.)
 app.use("*", secureHeaders());
@@ -42,6 +51,7 @@ app.use(
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Session-ID"],
+    exposeHeaders: ["X-Build-ID"],
   })
 );
 

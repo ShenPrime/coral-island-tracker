@@ -13,8 +13,25 @@ import type {
   UpdateNPCProgressRequest,
 } from "@coral-tracker/shared";
 import { getSessionId } from "./session";
+import { BUILD_ID } from "./queryClient";
 
 const API_BASE = "/api";
+
+/**
+ * Check if server returned a different build ID (new deployment)
+ * If so, dispatch an event to trigger the "new version" banner
+ */
+function checkBuildVersion(response: Response): void {
+  const serverBuildId = response.headers.get("X-Build-ID");
+  // Skip if server returns "dev" (local development) or if no header
+  if (!serverBuildId || serverBuildId === "dev") return;
+  // Skip if client is in dev mode
+  if (BUILD_ID === "dev") return;
+  // If mismatch, dispatch event
+  if (serverBuildId !== BUILD_ID) {
+    window.dispatchEvent(new CustomEvent("version-mismatch"));
+  }
+}
 
 /**
  * Get headers with session ID included
@@ -40,6 +57,9 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     },
     ...options,
   });
+
+  // Check for new deployment on every response
+  checkBuildVersion(response);
 
   const data = await response.json();
 

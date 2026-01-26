@@ -389,6 +389,7 @@ Contributions are welcome! Here's how to get started:
   - Background prefetch of all data on app startup
   - Automatic cache invalidation on new deployments
 - **UX**: Offline detection with warning banner
+- **UX**: New version detection - banner prompts refresh after redeploy
 - **Fix**: Altar prefetch now uses correct slugs
 
 ### v0.3.0
