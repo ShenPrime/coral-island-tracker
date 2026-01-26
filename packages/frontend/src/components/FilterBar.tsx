@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useId } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
+import { ARIA_LABELS } from "@/lib/aria-labels";
 import { 
   SEASONS, 
   TIMES_OF_DAY, 
@@ -154,7 +155,7 @@ function SearchAutocomplete({ items, value, onChange, onSelectItem }: SearchAuto
         onKeyDown={handleKeyDown}
         className="input pl-10"
         autoComplete="off"
-        aria-label="Search items"
+        aria-label={ARIA_LABELS.SEARCH_ITEMS}
       />
 
       {/* Autocomplete dropdown */}
@@ -404,7 +405,7 @@ function SingleSelectDropdown({
         <div 
           id={listboxId}
           role="listbox"
-          aria-label={label || "Select option"}
+          aria-label={label || ARIA_LABELS.SELECT_OPTION}
           className={`absolute top-full left-0 mt-1 w-48 border border-ocean-700/50 rounded-lg shadow-2xl z-50 overflow-hidden
             transform-gpu origin-top dropdown-menu
             ${isAnimating ? "dropdown-open" : "dropdown-close"}`}
@@ -678,9 +679,10 @@ export function FilterBar({
         {hasFilters && (
           <button
             onClick={clearAllFilters}
+            aria-label={ARIA_LABELS.CLEAR_ALL_FILTERS}
             className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-sm text-slate-400 hover:text-slate-200 flex-shrink-0"
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
             <span className="hidden sm:inline">Clear</span>
           </button>
         )}

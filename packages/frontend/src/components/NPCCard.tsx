@@ -14,6 +14,7 @@ import { RELATIONSHIP_STATUS_LABELS, CHARACTER_TYPE_LABELS } from "@coral-tracke
 import { CompactHeartDisplay } from "./HeartDisplay";
 import { ItemImage } from "./ui";
 import { seasonColors, relationshipColors } from "../lib/styles";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 // NPC data shape returned from API - exported for use in TrackCategory
 export interface NPCData {
@@ -159,9 +160,9 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
                     : "text-slate-400 hover:text-coral-400 hover:bg-coral-500/10"
                   }
                 `}
-                aria-label="Decrease hearts"
+                aria-label={ARIA_LABELS.DECREASE_HEARTS}
               >
-                <Minus size={16} />
+                <Minus size={16} aria-hidden="true" />
               </button>
               
               <div className={isAnimating ? "animate-heart-pop" : ""}>
@@ -178,7 +179,7 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
                     : "text-slate-400 hover:text-coral-400 hover:bg-coral-500/10"
                   }
                 `}
-                aria-label="Increase hearts"
+                aria-label={ARIA_LABELS.INCREASE_HEARTS}
               >
                 <Plus size={16} />
               </button>
@@ -248,9 +249,9 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
               onClick={handleInfoClick}
               onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors"
-              aria-label={`View details for ${npc.name}`}
+              aria-label={ARIA_LABELS.viewDetailsFor(npc.name)}
             >
-              <Info size={16} />
+              <Info size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

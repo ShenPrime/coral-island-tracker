@@ -20,6 +20,7 @@ import {
 import { HeartDisplay } from "./HeartDisplay";
 import { ItemImage, Modal, ModalBody, useModalContext } from "./ui";
 import { seasonColors } from "../lib/styles";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 // NPC data shape returned from API
 interface NPCData {
@@ -397,9 +398,9 @@ function NPCModalHeader({
       <button
         onClick={onClose}
         className="p-2 text-slate-400 hover:text-white hover:bg-ocean-800/50 rounded-lg transition-colors"
-        aria-label="Close dialog"
+        aria-label={ARIA_LABELS.CLOSE_DIALOG}
       >
-        <X size={20} />
+        <X size={20} aria-hidden="true" />
       </button>
     </div>
   );

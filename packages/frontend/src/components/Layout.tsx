@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "@/store/useStore";
+import { ARIA_LABELS } from "@/lib/aria-labels";
 import { SEASONS, type Season } from "@coral-tracker/shared";
 import {
   Fish,
@@ -219,15 +220,23 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-  return (
+return (
     <div className="min-h-screen flex">
+      {/* Skip to main content link - visible on focus for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-ocean-600 focus:text-white focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-400"
+      >
+        Skip to main content
+      </a>
+
       {/* Mobile header bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-deepsea-900/95 backdrop-blur-sm border-b border-ocean-800/30 px-4 py-3 flex items-center gap-3">
 <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-expanded={sidebarOpen}
           aria-controls="sidebar-nav"
-          aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-label={sidebarOpen ? ARIA_LABELS.CLOSE_NAV_MENU : ARIA_LABELS.OPEN_NAV_MENU}
           className="p-2 bg-deepsea-800 rounded-lg text-white border border-ocean-700/50 hover:bg-deepsea-700 transition-colors"
         >
           {sidebarOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
@@ -243,7 +252,7 @@ export function Layout({ children }: LayoutProps) {
 {/* Sidebar */}
       <aside
         id="sidebar-nav"
-        aria-label="Main navigation"
+        aria-label={ARIA_LABELS.MAIN_NAV}
         className={`
           fixed inset-y-0 left-0 z-40
           bg-gradient-to-b from-deepsea-800 to-deepsea-900 shadow-xl
@@ -280,7 +289,7 @@ export function Layout({ children }: LayoutProps) {
                     key={season}
                     onClick={() => toggleSeason(season)}
                     aria-pressed={isActive}
-                    aria-label={`Filter by ${seasonName}`}
+                    aria-label={ARIA_LABELS.filterBySeason(seasonName)}
                     className={`
                       flex flex-col items-center gap-0.5 rounded-lg
                       border transition-all duration-200 transform-gpu
@@ -386,7 +395,7 @@ export function Layout({ children }: LayoutProps) {
           <button
             onClick={toggleSidebarCollapsed}
             aria-expanded={!sidebarCollapsed}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={sidebarCollapsed ? ARIA_LABELS.EXPAND_SIDEBAR : ARIA_LABELS.COLLAPSE_SIDEBAR}
             className="hidden lg:flex absolute bottom-4 right-0 translate-x-1/2 w-6 h-6 bg-deepsea-700 border border-ocean-600/50 rounded-full items-center justify-center text-ocean-300 hover:text-white hover:bg-deepsea-600 transition-colors shadow-lg"
           >
             {sidebarCollapsed ? <ChevronsRight size={14} aria-hidden="true" /> : <ChevronsLeft size={14} aria-hidden="true" />}
@@ -394,8 +403,8 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main content - add top padding on mobile for fixed header */}
-      <main className="flex-1 p-4 pt-20 sm:p-6 sm:pt-20 lg:p-8 lg:pt-8">{children}</main>
+{/* Main content - add top padding on mobile for fixed header */}
+      <main id="main-content" className="flex-1 p-4 pt-20 sm:p-6 sm:pt-20 lg:p-8 lg:pt-8">{children}</main>
 
 {/* Overlay for mobile */}
       {sidebarOpen && (

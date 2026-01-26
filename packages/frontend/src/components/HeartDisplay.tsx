@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Heart } from "lucide-react";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 interface HeartDisplayProps {
   hearts: number;
@@ -82,9 +83,10 @@ export function HeartDisplay({
             ${interactive && isHovered && !isFilled ? "scale-110" : ""}
             focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400 focus-visible:ring-offset-1 focus-visible:ring-offset-deepsea-800 rounded-sm
           `}
-          aria-label={`Heart ${i + 1} of ${maxHearts}`}
+          aria-label={ARIA_LABELS.heartProgress(i + 1, maxHearts)}
         >
           <Heart
+            aria-hidden="true"
             className={`
               ${sizeClasses[size]}
               transition-all duration-200

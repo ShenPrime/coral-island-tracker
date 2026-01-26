@@ -4,6 +4,7 @@ import type { TempleItemWithProgress, Item, Season, Rarity } from "@coral-tracke
 import { ItemModal } from "./ItemModal";
 import { ItemImage } from "./ui";
 import { rarityColors, seasonColors, qualityColors } from "../lib/styles";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 interface TempleItemCardProps {
   item: TempleItemWithProgress;
@@ -192,9 +193,9 @@ const handleInfoClick = (e: React.MouseEvent) => {
               onClick={handleInfoClick}
               onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors flex-shrink-0"
-              aria-label={`View details for ${item.item_name}`}
+              aria-label={ARIA_LABELS.viewDetailsFor(item.item_name)}
             >
-              <Info size={16} />
+              <Info size={16} aria-hidden="true" />
             </button>
           )}
         </div>

@@ -1,3 +1,5 @@
+import { ARIA_LABELS } from "../lib/aria-labels";
+
 interface ProgressBarProps {
   value: number;
   max: number;
@@ -48,7 +50,7 @@ export function ProgressBar({
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={max}
-        aria-label={label || `Progress: ${value} of ${max}`}
+        aria-label={label || ARIA_LABELS.progressLabel(value, max)}
         className={`w-full bg-deepsea-900/80 rounded-full ${sizeClasses[size]} border border-ocean-800/30`}
       >
         <div

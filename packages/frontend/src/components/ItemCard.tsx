@@ -3,6 +3,7 @@ import { Check, MapPin, Clock, Cloud, Sparkles, Info, Gift, Package, Sun, Sprout
 import type { Item, Season, ItemTempleStatus } from "@coral-tracker/shared";
 import { ItemImage } from "./ui";
 import { rarityColors, rarityCardStyles, seasonColors, anyBadgeStyle } from "../lib/styles";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 interface ItemCardProps {
   item: Item & { completed?: boolean; notes?: string | null };
@@ -316,9 +317,9 @@ const handleClick = () => {
               onClick={handleInfoClick}
               onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors"
-              aria-label={`View details for ${item.name}`}
+              aria-label={ARIA_LABELS.viewDetailsFor(item.name)}
             >
-              <Info size={16} />
+              <Info size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

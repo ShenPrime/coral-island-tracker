@@ -6,6 +6,7 @@ import { Plus, Trash2, Check, Save } from "lucide-react";
 import type { SaveSlot } from "@coral-tracker/shared";
 import { useSaveSlots } from "@/hooks/useQueries";
 import { useCreateSaveSlot, useDeleteSaveSlot } from "@/hooks/useMutations";
+import { ARIA_LABELS } from "@/lib/aria-labels";
 
 interface SaveSlotWithStats extends SaveSlot {
   stats: {
@@ -148,10 +149,10 @@ export function SaveSlots() {
                     handleDelete(save.id);
                   }}
                   className="p-2 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
-                  title="Delete save slot"
+                  aria-label={ARIA_LABELS.deleteSaveSlot(save.name)}
                   disabled={deleteSaveMutation.isPending}
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={18} aria-hidden="true" />
                 </button>
               </div>
 

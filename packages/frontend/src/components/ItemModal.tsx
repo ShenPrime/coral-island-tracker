@@ -2,6 +2,7 @@ import { X, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unloc
 import type { Item, Season } from "@coral-tracker/shared";
 import { ItemImage, Modal, ModalBody, useModalContext } from "./ui";
 import { rarityColors, seasonColors, anyBadgeStyle, qualityTextColors } from "../lib/styles";
+import { ARIA_LABELS } from "../lib/aria-labels";
 
 interface ItemModalProps {
   item: Item & { completed?: boolean; notes?: string | null };
@@ -399,9 +400,9 @@ function ItemModalHeader({ item }: { item: Item }) {
       <button
         onClick={onClose}
         className="p-2 text-slate-400 hover:text-white hover:bg-ocean-800/50 rounded-lg transition-colors"
-        aria-label="Close dialog"
+        aria-label={ARIA_LABELS.CLOSE_DIALOG}
       >
-        <X size={20} />
+        <X size={20} aria-hidden="true" />
       </button>
     </div>
   );
