@@ -3,7 +3,7 @@
  * 
  * Provides keyboard navigation state and methods to the entire app.
  * Handles global shortcuts, grid focus state, search input refs,
- * and filter toolbar navigation.
+ * filter toolbar navigation, and interaction mode (keyboard vs mouse).
  */
 
 import { createContext, useContext, useCallback, useRef, useEffect, useState, type ReactNode, type RefObject } from "react";
@@ -35,6 +35,12 @@ export interface FilterNavigationHandler {
   isActive: boolean;
 }
 
+// Interaction mode: mouse or keyboard
+export type InteractionMode = "mouse" | "keyboard";
+
+// Mouse movement threshold (in pixels) to switch from keyboard to mouse mode
+const MOUSE_MOVEMENT_THRESHOLD = 5;
+
 interface KeyboardNavigationContextValue {
   // Search input ref registration
   searchInputRef: RefObject<HTMLInputElement>;
@@ -53,6 +59,9 @@ interface KeyboardNavigationContextValue {
   
   // Check if we're on a grid page
   isGridPage: boolean;
+  
+  // Interaction mode (mouse vs keyboard)
+  interactionMode: InteractionMode;
 }
 
 const KeyboardNavigationContext = createContext<KeyboardNavigationContextValue | null>(null);
@@ -87,6 +96,12 @@ export function KeyboardNavigationProvider({ children }: KeyboardNavigationProvi
 
   // Filter mode state
   const [isFilterModeActive, setFilterModeActive] = useState(false);
+  
+  // Interaction mode state - default to mouse mode
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>("mouse");
+  
+  // Track last mouse position for movement threshold detection
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Check if current page has a grid
   const isGridPage = location.pathname.startsWith("/track/") || 
@@ -350,26 +365,83 @@ export function KeyboardNavigationProvider({ children }: KeyboardNavigationProvi
     isFilterModeActive,
     setFilterModeActive,
     isGridPage,
+    interactionMode,
   };
+
+  // Handle mouse movement to switch to mouse mode
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    // If already in mouse mode, nothing to do
+    if (interactionMode === "mouse") {
+      lastMousePosRef.current = { x: event.clientX, y: event.clientY };
+      return;
+    }
+    
+    // Check if movement exceeds threshold
+    const lastPos = lastMousePosRef.current;
+    if (lastPos) {
+      const deltaX = Math.abs(event.clientX - lastPos.x);
+      const deltaY = Math.abs(event.clientY - lastPos.y);
+      
+      if (deltaX >= MOUSE_MOVEMENT_THRESHOLD || deltaY >= MOUSE_MOVEMENT_THRESHOLD) {
+        setInteractionMode("mouse");
+      }
+    }
+    
+    lastMousePosRef.current = { x: event.clientX, y: event.clientY };
+  }, [interactionMode]);
+
+  // Wrap handleKeyDown to also switch to keyboard mode
+  const handleKeyDownWithMode = useCallback((event: KeyboardEvent) => {
+    // Switch to keyboard mode on navigation keys (not on modifier-only presses)
+    const isNavigationKey = [
+      "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+      "Tab", "Enter", " ", "Home", "End",
+      "h", "j", "k", "l", "H", "J", "K", "L",
+    ].includes(event.key);
+    
+    if (isNavigationKey && interactionMode !== "keyboard") {
+      setInteractionMode("keyboard");
+    }
+    
+    // Call the original handler
+    handleKeyDown(event);
+  }, [handleKeyDown, interactionMode]);
 
   return (
     <KeyboardNavigationContext.Provider value={value}>
-      <GlobalKeyboardListener onKeyDown={handleKeyDown} />
+      <GlobalInputListener 
+        onKeyDown={handleKeyDownWithMode} 
+        onMouseMove={handleMouseMove}
+      />
       {children}
     </KeyboardNavigationContext.Provider>
   );
 }
 
-// Separate component to handle the event listener
-function GlobalKeyboardListener({ onKeyDown }: { onKeyDown: (e: KeyboardEvent) => void }) {
-  // Keep callback ref up to date
-  const callbackRef = useRef(onKeyDown);
-  callbackRef.current = onKeyDown;
+// Separate component to handle the event listeners
+interface GlobalInputListenerProps {
+  onKeyDown: (e: KeyboardEvent) => void;
+  onMouseMove: (e: MouseEvent) => void;
+}
+
+function GlobalInputListener({ onKeyDown, onMouseMove }: GlobalInputListenerProps) {
+  // Keep callback refs up to date
+  const keyDownRef = useRef(onKeyDown);
+  const mouseMoveRef = useRef(onMouseMove);
+  keyDownRef.current = onKeyDown;
+  mouseMoveRef.current = onMouseMove;
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => callbackRef.current(e);
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const handleKeyDown = (e: KeyboardEvent) => keyDownRef.current(e);
+    const handleMouseMove = (e: MouseEvent) => mouseMoveRef.current(e);
+    
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
   }, []);
 
   return null;

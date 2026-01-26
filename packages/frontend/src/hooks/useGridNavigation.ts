@@ -50,7 +50,7 @@ export function useGridNavigation({
   scrollToIndex,
   enabled = true,
 }: UseGridNavigationOptions): UseGridNavigationReturn {
-  const { registerGridHandler, unregisterGridHandler, isFilterModeActive } = useKeyboardNavigation();
+  const { registerGridHandler, unregisterGridHandler, isFilterModeActive, interactionMode } = useKeyboardNavigation();
   const { gridFocusIndex, setGridFocusIndex } = useStore();
 
   // Get persisted focus index for this category, default to 0 if items exist
@@ -182,8 +182,8 @@ export function useGridNavigation({
     }
   }, [categorySlug]); // Only on category change, not focus change
 
-  // Don't show focus indicator when filter mode is active
-  const showFocusIndicator = !isFilterModeActive;
+  // Don't show focus indicator when filter mode is active or when in mouse mode
+  const showFocusIndicator = !isFilterModeActive && interactionMode === "keyboard";
 
   return {
     focusedIndex,
