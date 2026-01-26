@@ -13,9 +13,14 @@ import type {
   UpdateNPCProgressRequest,
 } from "@coral-tracker/shared";
 import { getSessionId } from "./session";
-import { BUILD_ID } from "./queryClient";
 
 const API_BASE = "/api";
+
+/**
+ * Stores the BUILD_ID from the first API response.
+ * Used as baseline to detect new deployments.
+ */
+let initialBuildId: string | null = null;
 
 /**
  * Check if server returned a different build ID (new deployment)
@@ -25,10 +30,15 @@ function checkBuildVersion(response: Response): void {
   const serverBuildId = response.headers.get("X-Build-ID");
   // Skip if server returns "dev" (local development) or if no header
   if (!serverBuildId || serverBuildId === "dev") return;
-  // Skip if client is in dev mode
-  if (BUILD_ID === "dev") return;
-  // If mismatch, dispatch event
-  if (serverBuildId !== BUILD_ID) {
+
+  // First response - store as baseline
+  if (initialBuildId === null) {
+    initialBuildId = serverBuildId;
+    return;
+  }
+
+  // Subsequent responses - check for mismatch
+  if (serverBuildId !== initialBuildId) {
     window.dispatchEvent(new CustomEvent("version-mismatch"));
   }
 }

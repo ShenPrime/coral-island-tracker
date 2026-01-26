@@ -84,9 +84,11 @@ function App() {
 
   return (
     <KeyboardNavigationProvider>
+      {/* Fixed overlay banners - outside document flow */}
+      <OfflineBanner />
+      <NewVersionBanner />
+      
       <div className="flex flex-col min-h-screen">
-        <OfflineBanner />
-        <NewVersionBanner />
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
