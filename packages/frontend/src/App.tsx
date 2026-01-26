@@ -7,6 +7,7 @@ import { TrackCategory } from "@/pages/TrackCategory";
 import { LakeTempleOverview } from "@/pages/LakeTempleOverview";
 import { AltarDetail } from "@/pages/AltarDetail";
 import { KeyboardShortcutsPanel } from "@/components/KeyboardShortcutsPanel";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { KeyboardNavigationProvider } from "@/context/KeyboardNavigationContext";
 import { useStore } from "@/store/useStore";
 import { initSession } from "@/lib/session";
@@ -82,15 +83,18 @@ function App() {
 
   return (
     <KeyboardNavigationProvider>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/saves" element={<SaveSlots />} />
-          <Route path="/temple" element={<LakeTempleOverview />} />
-          <Route path="/temple/:altarSlug" element={<AltarDetail />} />
-          <Route path="/track/:slug" element={<TrackCategory />} />
-        </Routes>
-      </Layout>
+      <div className="flex flex-col min-h-screen">
+        <OfflineBanner />
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/saves" element={<SaveSlots />} />
+            <Route path="/temple" element={<LakeTempleOverview />} />
+            <Route path="/temple/:altarSlug" element={<AltarDetail />} />
+            <Route path="/track/:slug" element={<TrackCategory />} />
+          </Routes>
+        </Layout>
+      </div>
       <KeyboardShortcutsPanel />
     </KeyboardNavigationProvider>
   );

@@ -26,10 +26,10 @@ const CATEGORY_SLUGS = [
 
 // All altar slugs to prefetch
 const ALTAR_SLUGS = [
-  "altar-of-the-ocean-king",
-  "altar-of-the-spring-fairy",
-  "altar-of-the-earth-giant",
-  "altar-of-the-fire-spirit",
+  "crop-altar",
+  "catch-altar",
+  "advanced-altar",
+  "rare-altar",
 ];
 
 // Delay between batches in milliseconds

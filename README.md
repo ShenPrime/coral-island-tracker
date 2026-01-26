@@ -42,6 +42,10 @@ A comprehensive web-based progress tracker for the game Coral Island. Track your
 
 ### Technical Features
 - **Session-based Storage**: No login required - your data persists via browser session
+- **Persistent Cache**: Data cached to localStorage for instant loads across page refreshes
+- **Background Prefetch**: All data loaded in background on startup for instant navigation
+- **Offline Detection**: Warning banner when offline - prevents lost changes
+- **Auto-invalidation**: Cache automatically refreshes when new version is deployed
 - **Rate Limiting**: 100 requests per minute to prevent abuse
 - **Security Headers**: XSS protection, clickjacking prevention, content security
 
@@ -52,6 +56,7 @@ A comprehensive web-based progress tracker for the game Coral Island. Track your
 - **Backend**: Bun + Hono (lightweight web framework)
 - **Database**: PostgreSQL (via postgres.js)
 - **State Management**: Zustand (with persistence)
+- **Data Fetching**: React Query with localStorage persistence
 - **Icons**: Lucide React
 
 ## Prerequisites
@@ -373,7 +378,20 @@ Contributions are welcome! Here's how to get started:
 
 ## Changelog
 
-### v0.3.0 (Current)
+### v0.4.0 (Current)
+- **Accessibility**: Comprehensive keyboard navigation system
+  - Global shortcuts: `?` (help), `Shift+H/S/T` (navigation), `1-9`/`0` (categories), `/` (search)
+  - Grid navigation: Arrow keys/hjkl, Enter/Space to toggle, `i` for details
+  - Filter toolbar navigation with roving tabindex (ARIA toolbar pattern)
+  - Temple page navigation: 2x2 altar grid, two-level offering navigation
+- **Performance**: Persistent localStorage cache (7-day expiry)
+  - Instant page loads after first visit - no network requests on refresh
+  - Background prefetch of all data on app startup
+  - Automatic cache invalidation on new deployments
+- **UX**: Offline detection with warning banner
+- **Fix**: Altar prefetch now uses correct slugs
+
+### v0.3.0
 - Added NPC relationship tracking with heart-based progress
 - Marriage candidate system with dating/married status
 - Gift preferences display (loved, liked, disliked, hated)
