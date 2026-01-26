@@ -22,6 +22,8 @@ interface UseGridNavigationOptions {
   onDetails?: (index: number) => void;
   /** Callback for heart changes on NPCs (+/- keys) */
   onHeartsChange?: (index: number, delta: 1 | -1) => void;
+  /** Callback for toggling temple offering (o key) */
+  onToggleOffered?: (index: number) => void;
   /** Callback to scroll an item into view */
   scrollToIndex?: (index: number) => void;
   /** Whether grid navigation is enabled (set to false when modal is open) */
@@ -44,6 +46,7 @@ export function useGridNavigation({
   onSelect,
   onDetails,
   onHeartsChange,
+  onToggleOffered,
   scrollToIndex,
   enabled = true,
 }: UseGridNavigationOptions): UseGridNavigationReturn {
@@ -62,14 +65,16 @@ export function useGridNavigation({
   const onSelectRef = useRef(onSelect);
   const onDetailsRef = useRef(onDetails);
   const onHeartsChangeRef = useRef(onHeartsChange);
+  const onToggleOfferedRef = useRef(onToggleOffered);
   const scrollToIndexRef = useRef(scrollToIndex);
   
   useEffect(() => {
     onSelectRef.current = onSelect;
     onDetailsRef.current = onDetails;
     onHeartsChangeRef.current = onHeartsChange;
+    onToggleOfferedRef.current = onToggleOffered;
     scrollToIndexRef.current = scrollToIndex;
-  }, [onSelect, onDetails, onHeartsChange, scrollToIndex]);
+  }, [onSelect, onDetails, onHeartsChange, onToggleOffered, scrollToIndex]);
 
   // Set focused index and persist it
   const setFocusedIndex = useCallback((index: number) => {
@@ -142,6 +147,13 @@ export function useGridNavigation({
       case "hearts": {
         if (focusedIndex >= 0) {
           onHeartsChangeRef.current?.(focusedIndex, action.delta);
+        }
+        break;
+      }
+
+      case "toggleOffered": {
+        if (focusedIndex >= 0) {
+          onToggleOfferedRef.current?.(focusedIndex);
         }
         break;
       }

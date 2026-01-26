@@ -35,9 +35,10 @@ const altarColors: Record<string, { bg: string; border: string; icon: string }> 
 
 interface AltarCardProps {
   altar: AltarSummary;
+  isKeyboardFocused?: boolean;
 }
 
-export function AltarCard({ altar }: AltarCardProps) {
+export function AltarCard({ altar, isKeyboardFocused = false }: AltarCardProps) {
   const colors = altarColors[altar.slug] || altarColors["crop-altar"];
   const icon = altarIcons[altar.slug] || <Sprout size={28} />;
   const isComplete = altar.completed_offerings === altar.total_offerings;
@@ -51,6 +52,7 @@ export function AltarCard({ altar }: AltarCardProps) {
         bg-gradient-to-br ${colors.bg}
         border ${colors.border}
         ${isComplete ? "ring-2 ring-palm-500/50" : ""}
+        ${isKeyboardFocused ? "keyboard-focused" : ""}
       `}
     >
       <div className="flex items-start justify-between mb-4">

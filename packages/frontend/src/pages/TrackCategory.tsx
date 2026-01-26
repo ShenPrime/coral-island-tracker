@@ -534,6 +534,24 @@ export function TrackCategory() {
     }
   }, [isNPCCategory, filteredNPCs, handleNPCIncrement, handleNPCDecrement]);
 
+  // Handler for toggling temple offering (o key)
+  const handleGridToggleOffered = useCallback((index: number) => {
+    if (isNPCCategory) return; // NPCs don't have offerings
+    const item = sortedItems[index];
+    if (!item) return;
+
+    // Check if this item has temple requirements
+    const itemTempleStatus = templeStatus[item.id];
+    if (!itemTempleStatus?.is_temple_requirement) return;
+    
+    const requirements = itemTempleStatus.requirements;
+    if (!requirements || requirements.length === 0) return;
+
+    // Toggle the first requirement's offered state
+    const firstReq = requirements[0];
+    handleToggleOffered(item.id, firstReq.requirement_id, !firstReq.offered);
+  }, [isNPCCategory, sortedItems, templeStatus, handleToggleOffered]);
+
   // Initialize grid navigation (disabled when modal is open)
   const isModalOpen = !!selectedItem || !!selectedNPC;
   const { focusedIndex, showFocusIndicator } = useGridNavigation({
@@ -543,6 +561,7 @@ export function TrackCategory() {
     onSelect: handleGridSelect,
     onDetails: handleGridDetails,
     onHeartsChange: handleGridHeartsChange,
+    onToggleOffered: handleGridToggleOffered,
     scrollToIndex: (index) => scrollToIndexRef.current?.(index),
     enabled: !isModalOpen,
   });

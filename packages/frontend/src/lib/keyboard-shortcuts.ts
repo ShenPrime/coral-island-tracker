@@ -3,17 +3,18 @@
  * All shortcuts are defined here for consistency and easy modification.
  */
 
-// Category slugs in order (1-9 keys)
+// Category slugs in order (1-9, 0 keys)
 export const CATEGORY_ORDER = [
-  "fish",
-  "insects",
-  "critters",
-  "crops",
-  "artifacts",
-  "gems",
-  "forageables",
-  "cooking",
-  "npcs",
+  "fish",           // 1
+  "insects",        // 2
+  "critters",       // 3
+  "crops",          // 4
+  "artifacts",      // 5
+  "gems",           // 6
+  "forageables",    // 7
+  "cooking",        // 8
+  "npcs",           // 9
+  "artisan-products", // 0
 ] as const;
 
 export type CategorySlug = (typeof CATEGORY_ORDER)[number];
@@ -120,6 +121,11 @@ export const SHORTCUTS: Record<string, ShortcutDefinition> = {
   GRID_HEARTS_DOWN: {
     key: "-",
     description: "Decrease hearts (NPCs)",
+    category: "grid",
+  },
+  GRID_TOGGLE_OFFERED: {
+    key: "o",
+    description: "Toggle offered (Temple)",
     category: "grid",
   },
 

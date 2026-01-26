@@ -24,7 +24,8 @@ export type GridAction =
   | { type: "jump"; position: "first" | "last" }
   | { type: "select" }
   | { type: "details" }
-  | { type: "hearts"; delta: 1 | -1 };
+  | { type: "hearts"; delta: 1 | -1 }
+  | { type: "toggleOffered" };
 
 // Filter navigation handler type
 export interface FilterNavigationHandler {
@@ -195,11 +196,13 @@ export function KeyboardNavigationProvider({ children }: KeyboardNavigationProvi
       return;
     }
 
-    // Category quick jump (1-9)
+    // Category quick jump (1-9, 0 for 10th category)
     if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
       const num = parseInt(event.key, 10);
-      if (num >= 1 && num <= 9) {
-        const categorySlug = CATEGORY_ORDER[num - 1];
+      if (num >= 0 && num <= 9) {
+        // 0 maps to index 9 (10th category), 1-9 map to indices 0-8
+        const index = num === 0 ? 9 : num - 1;
+        const categorySlug = CATEGORY_ORDER[index];
         if (categorySlug) {
           event.preventDefault();
           navigate(`/track/${categorySlug}`);
@@ -311,6 +314,13 @@ export function KeyboardNavigationProvider({ children }: KeyboardNavigationProvi
       if (event.key === "-" || event.key === "_") {
         event.preventDefault();
         dispatchGridAction({ type: "hearts", delta: -1 });
+        return;
+      }
+
+      // Toggle offered (o) - for temple requirements
+      if (event.key === "o" || event.key === "O") {
+        event.preventDefault();
+        dispatchGridAction({ type: "toggleOffered" });
         return;
       }
     }

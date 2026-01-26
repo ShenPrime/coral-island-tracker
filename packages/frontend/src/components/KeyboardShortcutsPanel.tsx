@@ -31,7 +31,7 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: ["Shift", "H"], description: "Dashboard" },
       { keys: ["Shift", "S"], description: "Save Slots" },
       { keys: ["Shift", "T"], description: "Temple" },
-      { keys: ["1-9"], description: "Categories" },
+      { keys: ["1-9", "0"], description: "Categories" },
       { keys: ["/"], description: "Search" },
       { keys: ["Esc"], description: "Close/Clear" },
       { keys: ["["], description: "Toggle sidebar" },
@@ -47,6 +47,7 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: ["Home"], description: "First item" },
       { keys: ["End"], description: "Last item" },
       { keys: ["+", "-"], description: "Hearts (NPCs)" },
+      { keys: ["o"], description: "Toggle offered" },
     ],
   },
   {
@@ -59,11 +60,16 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
   },
 ];
 
-// Category names for the legend
+// Category names for the legend (matches CATEGORY_ORDER)
 const CATEGORY_NAMES = [
   "Fish", "Insects", "Critters", "Crops", "Artifacts",
-  "Gems", "Forageables", "Cooking", "NPCs"
+  "Gems", "Forageables", "Cooking", "NPCs", "Artisan Products"
 ];
+
+// Get the display key for a category index (1-9 for first 9, 0 for 10th)
+const getCategoryKey = (index: number): string => {
+  return index === 9 ? "0" : String(index + 1);
+};
 
 /**
  * Floating button that hints at keyboard shortcuts availability.
@@ -140,7 +146,7 @@ export function KeyboardShortcutsPanel() {
     <div
       className={`
         fixed bottom-4 right-4 z-50
-        w-[420px] max-w-[calc(100vw-2rem)]
+        w-[520px] max-w-[calc(100vw-2rem)]
         bg-deepsea-800/95 backdrop-blur-md
         border border-ocean-600/40 rounded-2xl
         shadow-2xl shadow-black/50
@@ -169,7 +175,7 @@ export function KeyboardShortcutsPanel() {
       {/* Content */}
       <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
         {/* Shortcut sections */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-6">
           {SHORTCUT_SECTIONS.map((section) => (
             <div key={section.title}>
               <h3 className="text-xs font-semibold text-ocean-400 uppercase tracking-wider mb-2">
@@ -189,7 +195,7 @@ export function KeyboardShortcutsPanel() {
                         </span>
                       ))}
                     </div>
-                    <span className="text-xs text-slate-400 truncate">{shortcut.description}</span>
+                    <span className="text-xs text-slate-400">{shortcut.description}</span>
                   </div>
                 ))}
               </div>
@@ -200,13 +206,13 @@ export function KeyboardShortcutsPanel() {
         {/* Category legend */}
         <div className="pt-3 border-t border-ocean-700/30">
           <h3 className="text-xs font-semibold text-ocean-400 uppercase tracking-wider mb-2">
-            Category Keys (1-9)
+            Category Keys (1-9, 0)
           </h3>
-          <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
             {CATEGORY_ORDER.map((slug, idx) => (
               <div key={slug} className="flex items-center gap-2">
-                <kbd className="kbd kbd-sm">{idx + 1}</kbd>
-                <span className="text-xs text-slate-400">{CATEGORY_NAMES[idx]}</span>
+                <kbd className="kbd kbd-sm">{getCategoryKey(idx)}</kbd>
+                <span className="text-sm text-slate-400">{CATEGORY_NAMES[idx]}</span>
               </div>
             ))}
           </div>

@@ -1,15 +1,39 @@
+import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { AltarCard } from "@/components/AltarCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, Sun } from "lucide-react";
 import { useTempleOverview } from "@/hooks/useQueries";
+import { useGridNavigation } from "@/hooks/useGridNavigation";
 
 export function LakeTempleOverview() {
   const { currentSaveId } = useStore();
+  const navigate = useNavigate();
 
   // Query hook
   const { data: overview, isLoading, error } = useTempleOverview(currentSaveId);
+
+  // Handle altar selection via keyboard
+  const handleAltarSelect = useCallback((index: number) => {
+    const altar = overview?.altars[index];
+    if (altar) {
+      navigate(`/temple/${altar.slug}`);
+    }
+  }, [overview?.altars, navigate]);
+
+  // Grid navigation for altar cards
+  const { focusedIndex, showFocusIndicator } = useGridNavigation({
+    itemCount: overview?.altars.length ?? 0,
+    columnCount: 2,
+    categorySlug: "temple-overview",
+    onSelect: handleAltarSelect,
+    onDetails: handleAltarSelect,
+    enabled: !!overview && overview.altars.length > 0,
+  });
+
+  const effectiveFocusedIndex = showFocusIndicator ? focusedIndex : -1;
 
   if (!currentSaveId) {
     return <NoSaveSlotWarning message="Please select a save slot first to track your temple offerings" />;
@@ -99,8 +123,12 @@ export function LakeTempleOverview() {
       {/* Altars Grid */}
       <h2 className="text-lg font-semibold text-white mb-4">Altars</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {overview.altars.map((altar) => (
-          <AltarCard key={altar.slug} altar={altar} />
+        {overview.altars.map((altar, index) => (
+          <AltarCard 
+            key={altar.slug} 
+            altar={altar} 
+            isKeyboardFocused={effectiveFocusedIndex === index}
+          />
         ))}
       </div>
 

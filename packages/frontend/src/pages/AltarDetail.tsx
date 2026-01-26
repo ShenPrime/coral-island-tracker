@@ -6,6 +6,7 @@ import { OfferingSection } from "@/components/OfferingSection";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, ArrowLeft, Sprout, Fish, Sparkles, Crown } from "lucide-react";
+import { useOfferingNavigation } from "@/hooks/useOfferingNavigation";
 import type { AltarWithOfferings } from "@coral-tracker/shared";
 
 const altarIcons: Record<string, React.ReactNode> = {
@@ -89,6 +90,22 @@ export function AltarDetail() {
     }
   };
 
+  // Keyboard navigation for offerings and items
+  const {
+    level,
+    focusedOfferingIndex,
+    focusedItemIndex,
+    expandedOfferings,
+    expandOffering,
+    collapseOffering,
+    showFocusIndicator,
+  } = useOfferingNavigation({
+    offerings: altar?.offerings ?? [],
+    categorySlug: `altar-${altarSlug}`,
+    onToggleOffered: (reqId, offered) => handleToggleOffered(reqId, offered),
+    enabled: !!altar,
+  });
+
 if (!currentSaveId) {
     return <NoSaveSlotWarning message="Please select a save slot first" />;
   }
@@ -170,7 +187,21 @@ if (!currentSaveId) {
             key={offering.slug}
             offering={offering}
             onToggleOffered={handleToggleOffered}
-            defaultExpanded={index === 0 || !offering.is_complete}
+            defaultExpanded={false}
+            isHeaderFocused={showFocusIndicator && level === 1 && focusedOfferingIndex === index}
+            focusedItemIndex={
+              showFocusIndicator && level === 2 && focusedOfferingIndex === index
+                ? focusedItemIndex
+                : -1
+            }
+            isExpandedControlled={expandedOfferings.has(offering.slug)}
+            onExpandChange={(expanded) => {
+              if (expanded) {
+                expandOffering(offering.slug);
+              } else {
+                collapseOffering(offering.slug);
+              }
+            }}
           />
         ))}
       </div>
