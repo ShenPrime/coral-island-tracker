@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Check, MapPin, Clock, Cloud, Sparkles, Info, Gift, Package, Sun, Sprout, Cog } from "lucide-react";
 import type { Item, Season, ItemTempleStatus } from "@coral-tracker/shared";
-import { ItemModal } from "./ItemModal";
 import { ItemImage } from "./ui";
 import { rarityColors, rarityCardStyles, seasonColors, anyBadgeStyle } from "../lib/styles";
 
@@ -12,25 +11,23 @@ interface ItemCardProps {
   showDetails?: boolean;
   templeStatus?: ItemTempleStatus;
   onToggleOffered?: (requirementId: number, offered: boolean) => void;
+  onShowDetails?: () => void;
 }
 
-export function ItemCard({ item, categorySlug, onToggle, showDetails = true, templeStatus, onToggleOffered }: ItemCardProps) {
+export const ItemCard = memo(function ItemCard({ 
+  item, 
+  categorySlug, 
+  onToggle, 
+  showDetails = true, 
+  templeStatus, 
+  onToggleOffered,
+  onShowDetails,
+}: ItemCardProps) {
+  // Animation state for completion
   const [justCompleted, setJustCompleted] = useState(false);
-  const [showModal, setShowModal] = useState(false);
 
-  // Parse metadata for display
-  let itemMetadata: Record<string, unknown> = {};
-  if (item.metadata) {
-    if (typeof item.metadata === 'string') {
-      try {
-        itemMetadata = JSON.parse(item.metadata);
-      } catch {
-        itemMetadata = {};
-      }
-    } else {
-      itemMetadata = item.metadata as Record<string, unknown>;
-    }
-  }
+  // Metadata should be pre-parsed from backend, just cast it
+  const itemMetadata = (item.metadata || {}) as Record<string, unknown>;
 
   const isOffering = 'altar' in itemMetadata;
   const requiredItems = itemMetadata.required_items as Array<{ name: string; quantity: number }> | undefined;
@@ -51,9 +48,9 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
     }
   };
 
-  const handleInfoClick = (e: React.MouseEvent) => {
+const handleInfoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowModal(true);
+    onShowDetails?.();
   };
 
   // Get rarity styles if item has rarity
@@ -61,15 +58,12 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
 
   return (
     <>
-      <div
+<div
         className={`
-          card cursor-pointer select-none p-4 sm:p-6
+          card cursor-pointer select-none p-4 sm:p-6 h-full
           transform-gpu
           hover:scale-[1.02] hover:-translate-y-1
-          ${item.completed 
-            ? "completed-card" 
-            : ""
-          }
+          ${item.completed ? "completed-card" : ""}
           ${justCompleted ? "animate-card-complete" : ""}
           ${rarityStyle ? rarityStyle.border : ""}
           ${rarityStyle ? (item.completed ? rarityStyle.glowCompleted : rarityStyle.glow) : ""}
@@ -78,7 +72,7 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
       >
         <div className="flex items-start gap-3 sm:gap-4">
           {/* Checkbox */}
-          <div
+<div
             className={`
               w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0
               transform-gpu
@@ -306,16 +300,7 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Modal */}
-      <ItemModal 
-        item={item}
-        categorySlug={categorySlug}
-        isOpen={showModal} 
-        onClose={() => setShowModal(false)}
-        onToggle={onToggle}
-      />
+</div>
     </>
   );
-}
+});

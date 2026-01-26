@@ -381,6 +381,11 @@ Contributions are welcome! Here's how to get started:
 - Dynamic filters that only show options with data
 - Character type categories (Townie, Merperson, Giant, Stranger, Pet)
 - Birthday and residence filtering for NPCs
+- **Performance**: Virtualized grid rendering for large categories (e.g., 429 artisan products)
+- **Performance**: React Query integration with 30-minute cache for data fetching
+- **Refactor**: Shared UI components (ItemImage, LoadingSpinner, Modal, NoSaveSlotWarning)
+- **Refactor**: Backend utility helpers for ownership verification and response formatting
+- Completion animations restored for item cards
 
 ### v0.2.0
 - Added Lake Temple offering tracking

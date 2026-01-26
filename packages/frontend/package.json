@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@coral-tracker/shared": "workspace:*",
+    "@react-hook/window-size": "3.1.1",
     "@tanstack/react-query": "5.90.20",
+    "@tanstack/react-virtual": "3.13.18",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

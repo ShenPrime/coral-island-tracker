@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { 
   Info, 
   Plus, 
@@ -12,12 +12,11 @@ import {
 import type { NPCMetadata, RelationshipStatus, Season } from "@coral-tracker/shared";
 import { RELATIONSHIP_STATUS_LABELS, CHARACTER_TYPE_LABELS } from "@coral-tracker/shared";
 import { CompactHeartDisplay } from "./HeartDisplay";
-import { NPCModal } from "./NPCModal";
 import { ItemImage } from "./ui";
 import { seasonColors, relationshipColors } from "../lib/styles";
 
-// NPC data shape returned from API
-interface NPCData {
+// NPC data shape returned from API - exported for use in TrackCategory
+export interface NPCData {
   id: number;
   name: string;
   slug: string;
@@ -37,11 +36,10 @@ interface NPCCardProps {
   npc: NPCData;
   onIncrement?: (npcId: number) => void;
   onDecrement?: (npcId: number) => void;
-  onUpdateProgress?: (npcId: number, hearts: number, status: RelationshipStatus) => void;
+  onShowDetails?: () => void;
 }
 
-export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPCCardProps) {
-  const [showModal, setShowModal] = useState(false);
+export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, onShowDetails }: NPCCardProps) {
   const [isAnimating, setIsAnimating] = useState(false);
 
   const metadata = npc.metadata;
@@ -69,7 +67,11 @@ export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPC
 
   const handleInfoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowModal(true);
+    onShowDetails?.();
+  };
+
+  const handleCardClick = () => {
+    onShowDetails?.();
   };
 
   // Card style based on relationship status
@@ -93,12 +95,12 @@ export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPC
     <>
       <div
         className={`
-          card cursor-pointer select-none p-4 sm:p-6
+          card cursor-pointer select-none p-4 sm:p-6 h-full
           transform-gpu
           hover:scale-[1.02] hover:-translate-y-1
           ${getCardStyle()}
         `}
-        onClick={() => setShowModal(true)}
+        onClick={handleCardClick}
       >
         <div className="flex items-start gap-3 sm:gap-4">
           {/* NPC Portrait */}
@@ -233,14 +235,6 @@ export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPC
           </div>
         </div>
       </div>
-
-      {/* Modal */}
-      <NPCModal
-        npc={npc}
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onUpdateProgress={onUpdateProgress}
-      />
     </>
   );
-}
+});

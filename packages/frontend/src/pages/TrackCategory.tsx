@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
-import { NPCCard } from "@/components/NPCCard";
+import { NPCCard, type NPCData } from "@/components/NPCCard";
 import { ProgressBar } from "@/components/ProgressBar";
+import { ItemModal } from "@/components/ItemModal";
+import { NPCModal } from "@/components/NPCModal";
+import { VirtualizedGrid } from "@/components/VirtualizedGrid";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { 
   FISHING_LOCATIONS, 
@@ -16,7 +19,7 @@ import {
   DEFAULT_FILTER_CONFIG,
   getGrowthTimeBucket,
 } from "@coral-tracker/shared";
-import type { Rarity, Season, CharacterType } from "@coral-tracker/shared";
+import type { Rarity, Season, CharacterType, RelationshipStatus } from "@coral-tracker/shared";
 
 // Query hooks
 import { 
@@ -24,6 +27,7 @@ import {
   useNPCs, 
   useCategory, 
   useTempleStatus,
+  type ItemWithProgress,
 } from "@/hooks/useQueries";
 
 // Mutation hooks
@@ -35,7 +39,23 @@ import {
   useDecrementNPCHearts,
 } from "@/hooks/useMutations";
 
-import type { RelationshipStatus } from "@coral-tracker/shared";
+// Card heights per category (in pixels) - must accommodate tallest card in each category
+// Heights account for: padding, image, name/rarity row, and all info rows that can wrap
+const CARD_HEIGHTS: Record<string, number> = {
+  fish: 280,           // 4 seasons (wrap) + long locations (2 lines) + 4 times + weather
+  crops: 200,          // 4 seasons (wrap) + growth days
+  'artisan-products': 220, // Equipment + Input + Processing time (3 lines)
+  gems: 160,           // Minimal info (no seasons, no location on card)
+  artifacts: 160,      // Minimal info (no seasons, no location on card)
+  forageables: 240,    // 4 seasons (wrap) + long locations (2 lines)
+  insects: 280,        // 4 seasons (wrap) + locations (2 lines) + times
+  critters: 280,       // 4 seasons (wrap) + locations (2 lines) + times
+  npcs: 260,           // Hearts display + Birthday + Residence + Character type + Gifts
+  'lake-temple': 200,  // Altar + Required items + Reward
+  cooking: 200,        // Seasons + ingredients
+};
+
+const DEFAULT_CARD_HEIGHT = 220;
 
 // Helper to parse metadata (handles string or object)
 function parseMetadata(metadata: unknown): Record<string, unknown> {
@@ -88,6 +108,13 @@ export function TrackCategory() {
 
   // Track previous slug to detect category changes
   const prevSlugRef = useRef<string | undefined>(undefined);
+
+  // ============================================================
+  // Shared modal state (single modal instance for all items)
+  // ============================================================
+
+  const [selectedItem, setSelectedItem] = useState<ItemWithProgress | null>(null);
+  const [selectedNPC, setSelectedNPC] = useState<NPCData | null>(null);
 
   // ============================================================
   // React Query hooks for data fetching
@@ -173,10 +200,10 @@ export function TrackCategory() {
   }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons, clearCharacterTypes, clearResidences, setMarriageCandidatesOnly, setBirthdaySeason]);
 
   // ============================================================
-  // Event handlers (using mutations)
+  // Event handlers (using mutations) - memoized for stable references
   // ============================================================
 
-  const handleToggle = (itemId: number, completed: boolean) => {
+  const handleToggle = useCallback((itemId: number, completed: boolean) => {
     if (!currentSaveId || !slug) return;
 
     updateProgressMutation.mutate({
@@ -185,9 +212,9 @@ export function TrackCategory() {
       category: slug,
       data: { completed },
     });
-  };
+  }, [currentSaveId, slug, updateProgressMutation]);
 
-  const handleToggleOffered = (itemId: number, requirementId: number, offered: boolean) => {
+  const handleToggleOffered = useCallback((itemId: number, requirementId: number, offered: boolean) => {
     if (!currentSaveId || !slug) return;
 
     updateTempleMutation.mutate({
@@ -197,27 +224,27 @@ export function TrackCategory() {
       category: slug,
       offered,
     });
-  };
+  }, [currentSaveId, slug, updateTempleMutation]);
 
-  const handleNPCIncrement = (npcId: number) => {
+  const handleNPCIncrement = useCallback((npcId: number) => {
     if (!currentSaveId) return;
 
     incrementHeartsMutation.mutate({
       saveId: currentSaveId,
       npcId,
     });
-  };
+  }, [currentSaveId, incrementHeartsMutation]);
 
-  const handleNPCDecrement = (npcId: number) => {
+  const handleNPCDecrement = useCallback((npcId: number) => {
     if (!currentSaveId) return;
 
     decrementHeartsMutation.mutate({
       saveId: currentSaveId,
       npcId,
     });
-  };
+  }, [currentSaveId, decrementHeartsMutation]);
 
-  const handleNPCUpdateProgress = (npcId: number, hearts: number, status: RelationshipStatus) => {
+  const handleNPCUpdateProgress = useCallback((npcId: number, hearts: number, status: RelationshipStatus) => {
     if (!currentSaveId) return;
 
     updateNPCProgressMutation.mutate({
@@ -226,7 +253,7 @@ export function TrackCategory() {
       hearts,
       relationship_status: status,
     });
-  };
+  }, [currentSaveId, updateNPCProgressMutation]);
 
   // ============================================================
   // Derived data for filters
@@ -515,42 +542,70 @@ export function TrackCategory() {
           </p>
         </div>
       ) : isNPCCategory ? (
-        // NPC rendering
+        // NPC rendering with virtualization
         <>
           <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
             Showing {filteredNPCs.length} NPCs ({filteredCompletedCount} max hearts)
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {filteredNPCs.map((npc) => (
+          <VirtualizedGrid
+            key={slug}
+            items={filteredNPCs}
+            getItemKey={(npc) => npc.id}
+            rowHeight={CARD_HEIGHTS.npcs}
+            renderItem={(npc) => (
               <NPCCard
-                key={npc.id}
                 npc={npc}
                 onIncrement={handleNPCIncrement}
                 onDecrement={handleNPCDecrement}
-                onUpdateProgress={handleNPCUpdateProgress}
+                onShowDetails={() => setSelectedNPC(npc)}
               />
-            ))}
-          </div>
+            )}
+          />
         </>
       ) : (
-        // Regular item rendering
+        // Regular item rendering with virtualization
         <>
           <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
             Showing {sortedItems.length} items ({filteredCompletedCount} completed)
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {sortedItems.map((item) => (
+          <VirtualizedGrid
+            key={slug}
+            items={sortedItems}
+            getItemKey={(item) => item.id}
+            rowHeight={slug ? (CARD_HEIGHTS[slug] ?? DEFAULT_CARD_HEIGHT) : DEFAULT_CARD_HEIGHT}
+            renderItem={(item) => (
               <ItemCard 
-                key={item.id} 
                 item={item}
                 categorySlug={slug}
                 onToggle={handleToggle}
                 templeStatus={templeStatus[item.id]}
                 onToggleOffered={(requirementId, offered) => handleToggleOffered(item.id, requirementId, offered)}
+                onShowDetails={() => setSelectedItem(item)}
               />
-            ))}
-          </div>
+            )}
+          />
         </>
+      )}
+
+      {/* Shared Item Modal */}
+      {selectedItem && (
+        <ItemModal
+          item={selectedItem}
+          categorySlug={slug}
+          isOpen={true}
+          onClose={() => setSelectedItem(null)}
+          onToggle={handleToggle}
+        />
+      )}
+
+      {/* Shared NPC Modal */}
+      {selectedNPC && (
+        <NPCModal
+          npc={selectedNPC}
+          isOpen={true}
+          onClose={() => setSelectedNPC(null)}
+          onUpdateProgress={handleNPCUpdateProgress}
+        />
       )}
     </div>
   );
