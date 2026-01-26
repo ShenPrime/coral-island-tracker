@@ -18,10 +18,15 @@ export const ARIA_LABELS = {
   SEARCH_ITEMS: "Search items",
   CLEAR_ALL_FILTERS: "Clear all filters",
   SELECT_OPTION: "Select option",
+  FILTER_TOOLBAR: "Filter options. Press F to focus, arrow keys to navigate between filters.",
 
   // NPC Hearts
   INCREASE_HEARTS: "Increase hearts",
   DECREASE_HEARTS: "Decrease hearts",
+
+  // Keyboard Navigation
+  KEYBOARD_SHORTCUTS: "Keyboard shortcuts",
+  KEYBOARD_FOCUSED_ITEM: "Keyboard focused item",
 
   // Dynamic labels (functions)
   viewDetailsFor: (name: string) => `View details for ${name}`,

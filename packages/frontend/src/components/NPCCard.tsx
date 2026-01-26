@@ -38,9 +38,11 @@ interface NPCCardProps {
   onIncrement?: (npcId: number) => void;
   onDecrement?: (npcId: number) => void;
   onShowDetails?: () => void;
+  /** Whether this card is focused via keyboard navigation */
+  isKeyboardFocused?: boolean;
 }
 
-export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, onShowDetails }: NPCCardProps) {
+export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, onShowDetails, isKeyboardFocused = false }: NPCCardProps) {
   const [isAnimating, setIsAnimating] = useState(false);
 
   const metadata = npc.metadata;
@@ -118,6 +120,7 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
           hover:scale-[1.02] hover:-translate-y-1
           focus:outline-none focus-visible:ring-2 focus-visible:ring-ocean-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deepsea-900
           ${getCardStyle()}
+          ${isKeyboardFocused ? "keyboard-focused" : ""}
         `}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}

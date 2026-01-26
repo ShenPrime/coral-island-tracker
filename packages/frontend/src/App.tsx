@@ -6,6 +6,8 @@ import { SaveSlots } from "@/pages/SaveSlots";
 import { TrackCategory } from "@/pages/TrackCategory";
 import { LakeTempleOverview } from "@/pages/LakeTempleOverview";
 import { AltarDetail } from "@/pages/AltarDetail";
+import { KeyboardShortcutsPanel } from "@/components/KeyboardShortcutsPanel";
+import { KeyboardNavigationProvider } from "@/context/KeyboardNavigationContext";
 import { useStore } from "@/store/useStore";
 import { initSession } from "@/lib/session";
 import { useCategories, useSaveSlots } from "@/hooks/useQueries";
@@ -75,15 +77,18 @@ function App() {
   }
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/saves" element={<SaveSlots />} />
-        <Route path="/temple" element={<LakeTempleOverview />} />
-        <Route path="/temple/:altarSlug" element={<AltarDetail />} />
-        <Route path="/track/:slug" element={<TrackCategory />} />
-      </Routes>
-    </Layout>
+    <KeyboardNavigationProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/saves" element={<SaveSlots />} />
+          <Route path="/temple" element={<LakeTempleOverview />} />
+          <Route path="/temple/:altarSlug" element={<AltarDetail />} />
+          <Route path="/track/:slug" element={<TrackCategory />} />
+        </Routes>
+      </Layout>
+      <KeyboardShortcutsPanel />
+    </KeyboardNavigationProvider>
   );
 }
 

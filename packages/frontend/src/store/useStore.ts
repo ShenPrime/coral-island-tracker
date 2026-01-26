@@ -74,6 +74,14 @@ interface AppState {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
+
+  // Keyboard navigation
+  isShortcutsModalOpen: boolean;
+  setShortcutsModalOpen: (open: boolean) => void;
+  
+  // Grid focus persistence (per category slug)
+  gridFocusIndex: Record<string, number>;
+  setGridFocusIndex: (category: string, index: number) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -205,6 +213,17 @@ export const useStore = create<AppState>()(
       sidebarCollapsed: false,
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       toggleSidebarCollapsed: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
+      // Keyboard navigation
+      isShortcutsModalOpen: false,
+      setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
+      
+      // Grid focus persistence
+      gridFocusIndex: {},
+      setGridFocusIndex: (category, index) =>
+        set((state) => ({
+          gridFocusIndex: { ...state.gridFocusIndex, [category]: index },
+        })),
     }),
     {
       name: "coral-tracker-storage",
@@ -213,6 +232,7 @@ export const useStore = create<AppState>()(
         sidebarOpen: state.sidebarOpen,
         sidebarCollapsed: state.sidebarCollapsed,
         selectedSeasons: state.selectedSeasons,
+        gridFocusIndex: state.gridFocusIndex,
       }),
     }
   )

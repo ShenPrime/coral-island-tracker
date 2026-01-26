@@ -9,9 +9,11 @@ import { ARIA_LABELS } from "../lib/aria-labels";
 interface TempleItemCardProps {
   item: TempleItemWithProgress;
   onToggleOffered: (requirementId: number, offered: boolean) => void;
+  /** Whether this card is focused via keyboard navigation */
+  isKeyboardFocused?: boolean;
 }
 
-export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
+export function TempleItemCard({ item, onToggleOffered, isKeyboardFocused = false }: TempleItemCardProps) {
   const [justOffered, setJustOffered] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
@@ -83,6 +85,7 @@ const handleInfoClick = (e: React.MouseEvent) => {
           focus:outline-none focus-visible:ring-2 focus-visible:ring-ocean-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deepsea-900
           ${item.offered ? "completed-card" : ""}
           ${justOffered ? "animate-card-complete" : ""}
+          ${isKeyboardFocused ? "keyboard-focused" : ""}
         `}
         onClick={handleClick}
         onKeyDown={handleKeyDown}

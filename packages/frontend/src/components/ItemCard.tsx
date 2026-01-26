@@ -13,6 +13,8 @@ interface ItemCardProps {
   templeStatus?: ItemTempleStatus;
   onToggleOffered?: (requirementId: number, offered: boolean) => void;
   onShowDetails?: () => void;
+  /** Whether this card is focused via keyboard navigation */
+  isKeyboardFocused?: boolean;
 }
 
 export const ItemCard = memo(function ItemCard({ 
@@ -23,6 +25,7 @@ export const ItemCard = memo(function ItemCard({
   templeStatus, 
   onToggleOffered,
   onShowDetails,
+  isKeyboardFocused = false,
 }: ItemCardProps) {
   // Animation state for completion
   const [justCompleted, setJustCompleted] = useState(false);
@@ -87,6 +90,7 @@ const handleClick = () => {
           ${justCompleted ? "animate-card-complete" : ""}
           ${rarityStyle ? rarityStyle.border : ""}
           ${rarityStyle ? (item.completed ? rarityStyle.glowCompleted : rarityStyle.glow) : ""}
+          ${isKeyboardFocused ? "keyboard-focused" : ""}
         `}
         onClick={handleClick}
         onKeyDown={handleKeyDown}

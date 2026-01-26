@@ -9,6 +9,8 @@ import { ItemModal } from "@/components/ItemModal";
 import { NPCModal } from "@/components/NPCModal";
 import { VirtualizedGrid } from "@/components/VirtualizedGrid";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
+import { useGridNavigation } from "@/hooks/useGridNavigation";
+import { useWindowWidth } from "@react-hook/window-size";
 import { 
   FISHING_LOCATIONS, 
   FORAGING_LOCATIONS, 
@@ -152,6 +154,16 @@ export function TrackCategory() {
   const updateNPCProgressMutation = useUpdateNPCProgress();
   const incrementHeartsMutation = useIncrementNPCHearts();
   const decrementHeartsMutation = useDecrementNPCHearts();
+
+  // ============================================================
+  // Keyboard grid navigation
+  // ============================================================
+
+  const windowWidth = useWindowWidth();
+  const columnCount = windowWidth < 768 ? 1 : 2;
+  
+  // Ref for scroll-to-index function from VirtualizedGrid
+  const scrollToIndexRef = useRef<((index: number) => void) | null>(null);
 
   // ============================================================
   // Clear filters on category change
@@ -482,6 +494,63 @@ export function TrackCategory() {
   const filteredCount = isNPCCategory ? filteredNPCs.length : sortedItems.length;
 
   // ============================================================
+  // Grid navigation handlers
+  // ============================================================
+
+  // Handler for selecting an item (Enter/Space)
+  const handleGridSelect = useCallback((index: number) => {
+    if (isNPCCategory) {
+      const npc = filteredNPCs[index];
+      if (npc) setSelectedNPC(npc);
+    } else {
+      const item = sortedItems[index];
+      if (item) {
+        handleToggle(item.id, !item.completed);
+      }
+    }
+  }, [isNPCCategory, filteredNPCs, sortedItems, handleToggle]);
+
+  // Handler for showing item details (i key)
+  const handleGridDetails = useCallback((index: number) => {
+    if (isNPCCategory) {
+      const npc = filteredNPCs[index];
+      if (npc) setSelectedNPC(npc);
+    } else {
+      const item = sortedItems[index];
+      if (item) setSelectedItem(item);
+    }
+  }, [isNPCCategory, filteredNPCs, sortedItems]);
+
+  // Handler for NPC heart changes (+/- keys)
+  const handleGridHeartsChange = useCallback((index: number, delta: 1 | -1) => {
+    if (!isNPCCategory) return;
+    const npc = filteredNPCs[index];
+    if (!npc) return;
+
+    if (delta > 0) {
+      handleNPCIncrement(npc.id);
+    } else {
+      handleNPCDecrement(npc.id);
+    }
+  }, [isNPCCategory, filteredNPCs, handleNPCIncrement, handleNPCDecrement]);
+
+  // Initialize grid navigation (disabled when modal is open)
+  const isModalOpen = !!selectedItem || !!selectedNPC;
+  const { focusedIndex, showFocusIndicator } = useGridNavigation({
+    itemCount: filteredCount,
+    columnCount,
+    categorySlug: slug || "",
+    onSelect: handleGridSelect,
+    onDetails: handleGridDetails,
+    onHeartsChange: handleGridHeartsChange,
+    scrollToIndex: (index) => scrollToIndexRef.current?.(index),
+    enabled: !isModalOpen,
+  });
+
+  // Only show grid focus indicator when not in filter mode
+  const effectiveFocusedIndex = showFocusIndicator ? focusedIndex : -1;
+
+  // ============================================================
   // Render
   // ============================================================
 
@@ -552,12 +621,15 @@ export function TrackCategory() {
             items={filteredNPCs}
             getItemKey={(npc) => npc.id}
             rowHeight={CARD_HEIGHTS.npcs}
-            renderItem={(npc) => (
+            focusedIndex={effectiveFocusedIndex}
+            onScrollToIndexReady={(fn) => { scrollToIndexRef.current = fn; }}
+            renderItem={(npc, _index, isKeyboardFocused) => (
               <NPCCard
                 npc={npc}
                 onIncrement={handleNPCIncrement}
                 onDecrement={handleNPCDecrement}
                 onShowDetails={() => setSelectedNPC(npc)}
+                isKeyboardFocused={isKeyboardFocused}
               />
             )}
           />
@@ -573,7 +645,9 @@ export function TrackCategory() {
             items={sortedItems}
             getItemKey={(item) => item.id}
             rowHeight={slug ? (CARD_HEIGHTS[slug] ?? DEFAULT_CARD_HEIGHT) : DEFAULT_CARD_HEIGHT}
-            renderItem={(item) => (
+            focusedIndex={effectiveFocusedIndex}
+            onScrollToIndexReady={(fn) => { scrollToIndexRef.current = fn; }}
+            renderItem={(item, _index, isKeyboardFocused) => (
               <ItemCard 
                 item={item}
                 categorySlug={slug}
@@ -581,6 +655,7 @@ export function TrackCategory() {
                 templeStatus={templeStatus[item.id]}
                 onToggleOffered={(requirementId, offered) => handleToggleOffered(item.id, requirementId, offered)}
                 onShowDetails={() => setSelectedItem(item)}
+                isKeyboardFocused={isKeyboardFocused}
               />
             )}
           />

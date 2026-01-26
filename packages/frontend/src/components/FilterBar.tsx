@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect, useMemo, useId } from "react";
+import { useState, useRef, useEffect, useMemo, useId, useCallback, type RefObject } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { ARIA_LABELS } from "@/lib/aria-labels";
+import { useKeyboardNavigation } from "@/context/KeyboardNavigationContext";
+import { useFilterNavigation } from "@/hooks/useFilterNavigation";
 import { 
   SEASONS, 
   TIMES_OF_DAY, 
@@ -29,12 +31,15 @@ interface SearchAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelectItem?: (item: { id: number; name: string }) => void;
+  externalInputRef?: RefObject<HTMLInputElement>;
 }
 
-function SearchAutocomplete({ items, value, onChange, onSelectItem }: SearchAutocompleteProps) {
+function SearchAutocomplete({ items, value, onChange, onSelectItem, externalInputRef }: SearchAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLInputElement>(null);
+  // Use external ref if provided, otherwise use internal
+  const inputRef = externalInputRef || internalInputRef;
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +210,12 @@ interface MultiSelectDropdownProps {
   selected: string[];
   onToggle: (option: string) => void;
   formatOption?: (option: string) => string;
+  /** Ref callback for filter navigation */
+  buttonRef?: (el: HTMLButtonElement | null) => void;
+  /** Tab index for roving tabindex pattern */
+  tabIndex?: 0 | -1;
+  /** Whether this filter is focused via keyboard navigation */
+  isFilterFocused?: boolean;
 }
 
 function MultiSelectDropdown({
@@ -213,10 +224,14 @@ function MultiSelectDropdown({
   selected,
   onToggle,
   formatOption = (o) => o.charAt(0).toUpperCase() + o.slice(1),
+  buttonRef,
+  tabIndex = 0,
+  isFilterFocused = false,
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const internalButtonRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
 
   // Close dropdown when clicking outside
@@ -248,6 +263,12 @@ function MultiSelectDropdown({
     }
   };
 
+  // Combined ref handler
+  const setButtonRef = useCallback((el: HTMLButtonElement | null) => {
+    (internalButtonRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+    buttonRef?.(el);
+  }, [buttonRef]);
+
   const displayText = selected.length === 0 
     ? label 
     : selected.length === 1 
@@ -256,15 +277,17 @@ function MultiSelectDropdown({
 
   return (
     <div className="relative" ref={dropdownRef}>
-<button
+      <button
+        ref={setButtonRef}
         type="button"
         onClick={handleToggle}
+        tabIndex={tabIndex}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        className={`input w-auto min-w-[100px] sm:min-w-[130px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
+        className={`filter-button input w-auto min-w-[100px] sm:min-w-[130px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
           selected.length > 0 ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
-        } ${isOpen ? "border-ocean-400" : ""}`}
+        } ${isOpen ? "border-ocean-400" : ""} ${isFilterFocused ? "filter-focused" : ""}`}
       >
         <span className="truncate">{displayText}</span>
         <ChevronDown 
@@ -332,6 +355,12 @@ interface SingleSelectDropdownProps {
   selected: string;
   onSelect: (option: string) => void;
   formatOption?: (option: string) => string;
+  /** Ref callback for filter navigation */
+  buttonRef?: (el: HTMLButtonElement | null) => void;
+  /** Tab index for roving tabindex pattern */
+  tabIndex?: 0 | -1;
+  /** Whether this filter is focused via keyboard navigation */
+  isFilterFocused?: boolean;
 }
 
 function SingleSelectDropdown({
@@ -340,10 +369,14 @@ function SingleSelectDropdown({
   selected,
   onSelect,
   formatOption = (o) => o,
+  buttonRef,
+  tabIndex = 0,
+  isFilterFocused = false,
 }: SingleSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const internalButtonRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
 
   useEffect(() => {
@@ -379,19 +412,27 @@ function SingleSelectDropdown({
     handleClose();
   };
 
+  // Combined ref handler
+  const setButtonRef = useCallback((el: HTMLButtonElement | null) => {
+    (internalButtonRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+    buttonRef?.(el);
+  }, [buttonRef]);
+
   const displayText = formatOption(selected);
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        ref={setButtonRef}
         type="button"
         onClick={handleToggle}
+        tabIndex={tabIndex}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        className={`input w-auto min-w-[90px] sm:min-w-[120px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
+        className={`filter-button input w-auto min-w-[90px] sm:min-w-[120px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
           selected !== options[0] ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
-        } ${isOpen ? "border-ocean-400" : ""}`}
+        } ${isOpen ? "border-ocean-400" : ""} ${isFilterFocused ? "filter-focused" : ""}`}
       >
         <span className="truncate">{displayText}</span>
         <ChevronDown 
@@ -515,6 +556,59 @@ export function FilterBar({
     selectedBirthdaySeason !== null ||
     showCompleted !== null;
 
+  // Get keyboard navigation context
+  const { searchInputRef, registerFilterHandler, unregisterFilterHandler, setFilterModeActive } = useKeyboardNavigation();
+
+  // Filter navigation hook
+  const filterNav = useFilterNavigation({
+    onExit: () => setFilterModeActive(false),
+    onActivate: () => setFilterModeActive(true),
+  });
+
+  // Register filter handler with context
+  useEffect(() => {
+    registerFilterHandler({
+      activate: filterNav.activate,
+      focusNext: filterNav.focusNext,
+      exit: filterNav.exit,
+      isActive: filterNav.isActive,
+    });
+    return () => unregisterFilterHandler();
+  }, [registerFilterHandler, unregisterFilterHandler, filterNav.activate, filterNav.focusNext, filterNav.exit, filterNav.isActive]);
+
+  // Memoize filter indices based on visible filters
+  // This ensures consistent indices even when filters conditionally render
+  const filterIndices = useMemo(() => {
+    let index = 0;
+    const indices: Record<string, number> = {};
+    
+    if (config.showSeasons) indices.seasons = index++;
+    if (config.showTime) indices.time = index++;
+    if (config.showLocation && availableLocations.length > 0) indices.location = index++;
+    if (config.showRarity && availableRarities.length > 0) indices.rarity = index++;
+    if (config.showEquipment && availableEquipment.length > 0) indices.equipment = index++;
+    if (config.showGrowthTime) indices.growthTime = index++;
+    
+    // NPC-specific
+    if (isNPCCategory) {
+      if (availableBirthdaySeasons.length > 0) indices.birthday = index++;
+      if (availableCharacterTypes.length > 0) indices.characterType = index++;
+      if (availableResidences.length > 0) indices.residence = index++;
+      indices.marriageCandidates = index++;
+    }
+    
+    // Price sort (not for NPCs)
+    if (config.showPriceSort && !isNPCCategory) indices.priceSort = index++;
+    
+    // Completion filter (always shown)
+    indices.completion = index++;
+    
+    // Clear button (only when has filters)
+    if (hasFilters) indices.clear = index++;
+    
+    return indices;
+  }, [config, availableLocations.length, availableRarities.length, availableEquipment.length, isNPCCategory, availableBirthdaySeasons.length, availableCharacterTypes.length, availableResidences.length, hasFilters]);
+
   return (
     <div className="card mb-6 relative z-20">
       {/* Search - full width on mobile */}
@@ -523,16 +617,26 @@ export function FilterBar({
           items={items}
           value={searchQuery}
           onChange={setSearchQuery}
+          externalInputRef={searchInputRef}
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      {/* Filter toolbar with roving tabindex */}
+      <div 
+        role="toolbar"
+        aria-label={ARIA_LABELS.FILTER_TOOLBAR}
+        aria-orientation="horizontal"
+        className="flex flex-wrap items-center gap-2 sm:gap-3"
+        onKeyDown={filterNav.handleToolbarKeyDown}
+        onBlur={filterNav.handleToolbarBlur}
+      >
         {/* Search with autocomplete - hidden on mobile, shown in flex on larger */}
         <div className="hidden sm:block flex-1 min-w-[200px]">
           <SearchAutocomplete
             items={items}
             value={searchQuery}
             onChange={setSearchQuery}
+            externalInputRef={searchInputRef}
           />
         </div>
 
@@ -543,6 +647,9 @@ export function FilterBar({
             options={SEASONS}
             selected={selectedSeasons}
             onToggle={(s) => toggleSeason(s as Season)}
+            buttonRef={filterNav.registerFilter(filterIndices.seasons)}
+            tabIndex={filterNav.getTabIndex(filterIndices.seasons)}
+            isFilterFocused={filterNav.isFocused(filterIndices.seasons)}
           />
         )}
 
@@ -553,6 +660,9 @@ export function FilterBar({
             options={TIMES_OF_DAY}
             selected={selectedTimes}
             onToggle={(t) => toggleTime(t as TimeOfDay)}
+            buttonRef={filterNav.registerFilter(filterIndices.time)}
+            tabIndex={filterNav.getTabIndex(filterIndices.time)}
+            isFilterFocused={filterNav.isFocused(filterIndices.time)}
           />
         )}
 
@@ -564,6 +674,9 @@ export function FilterBar({
             selected={selectedLocations}
             onToggle={toggleLocation}
             formatOption={(o) => o}
+            buttonRef={filterNav.registerFilter(filterIndices.location)}
+            tabIndex={filterNav.getTabIndex(filterIndices.location)}
+            isFilterFocused={filterNav.isFocused(filterIndices.location)}
           />
         )}
 
@@ -575,6 +688,9 @@ export function FilterBar({
             selected={selectedRarities}
             onToggle={(r) => toggleRarity(r as Rarity)}
             formatOption={formatRarity}
+            buttonRef={filterNav.registerFilter(filterIndices.rarity)}
+            tabIndex={filterNav.getTabIndex(filterIndices.rarity)}
+            isFilterFocused={filterNav.isFocused(filterIndices.rarity)}
           />
         )}
 
@@ -586,6 +702,9 @@ export function FilterBar({
             selected={selectedEquipment}
             onToggle={toggleEquipment}
             formatOption={(o) => o}
+            buttonRef={filterNav.registerFilter(filterIndices.equipment)}
+            tabIndex={filterNav.getTabIndex(filterIndices.equipment)}
+            isFilterFocused={filterNav.isFocused(filterIndices.equipment)}
           />
         )}
 
@@ -597,6 +716,9 @@ export function FilterBar({
             selected={selectedGrowthTime}
             onToggle={(b) => toggleGrowthTime(b as GrowthTimeBucket)}
             formatOption={(b) => GROWTH_TIME_LABELS[b as GrowthTimeBucket]}
+            buttonRef={filterNav.registerFilter(filterIndices.growthTime)}
+            tabIndex={filterNav.getTabIndex(filterIndices.growthTime)}
+            isFilterFocused={filterNav.isFocused(filterIndices.growthTime)}
           />
         )}
 
@@ -611,6 +733,9 @@ export function FilterBar({
                 selected={selectedBirthdaySeason || "Any Season"}
                 onSelect={(s) => setBirthdaySeason(s === "Any Season" ? null : s as Season)}
                 formatOption={(s) => s === "Any Season" ? "Birthday" : s.charAt(0).toUpperCase() + s.slice(1)}
+                buttonRef={filterNav.registerFilter(filterIndices.birthday)}
+                tabIndex={filterNav.getTabIndex(filterIndices.birthday)}
+                isFilterFocused={filterNav.isFocused(filterIndices.birthday)}
               />
             )}
 
@@ -622,6 +747,9 @@ export function FilterBar({
                 selected={selectedCharacterTypes}
                 onToggle={(t) => toggleCharacterType(t as CharacterType)}
                 formatOption={(t) => CHARACTER_TYPE_LABELS[t as CharacterType] || t}
+                buttonRef={filterNav.registerFilter(filterIndices.characterType)}
+                tabIndex={filterNav.getTabIndex(filterIndices.characterType)}
+                isFilterFocused={filterNav.isFocused(filterIndices.characterType)}
               />
             )}
 
@@ -633,19 +761,24 @@ export function FilterBar({
                 selected={selectedResidences}
                 onToggle={toggleResidence}
                 formatOption={(r) => r}
+                buttonRef={filterNav.registerFilter(filterIndices.residence)}
+                tabIndex={filterNav.getTabIndex(filterIndices.residence)}
+                isFilterFocused={filterNav.isFocused(filterIndices.residence)}
               />
             )}
 
             {/* Marriage Candidates toggle */}
             <button
+              ref={filterNav.registerFilter(filterIndices.marriageCandidates)}
               type="button"
               onClick={() => setMarriageCandidatesOnly(!marriageCandidatesOnly)}
+              tabIndex={filterNav.getTabIndex(filterIndices.marriageCandidates)}
               aria-pressed={marriageCandidatesOnly}
-              className={`input w-auto text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center gap-2 transition-all duration-200 ${
+              className={`filter-button input w-auto text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center gap-2 transition-all duration-200 ${
                 marriageCandidatesOnly 
                   ? "text-pink-300 border-pink-500/50 bg-pink-500/10" 
                   : "text-slate-400"
-              }`}
+              } ${filterNav.isFocused(filterIndices.marriageCandidates) ? "filter-focused" : ""}`}
             >
               <span aria-hidden="true" className={marriageCandidatesOnly ? "text-pink-400" : ""}>♥</span>
               <span className="hidden sm:inline">Candidates</span>
@@ -662,6 +795,9 @@ export function FilterBar({
             selected={priceSort}
             onSelect={(s) => setPriceSort(s as PriceSortOption)}
             formatOption={(s) => PRICE_SORT_LABELS[s as PriceSortOption]}
+            buttonRef={filterNav.registerFilter(filterIndices.priceSort)}
+            tabIndex={filterNav.getTabIndex(filterIndices.priceSort)}
+            isFilterFocused={filterNav.isFocused(filterIndices.priceSort)}
           />
         )}
 
@@ -673,14 +809,21 @@ export function FilterBar({
           onSelect={(value) => {
             setShowCompleted(value === "All Items" ? null : value === "Completed");
           }}
+          buttonRef={filterNav.registerFilter(filterIndices.completion)}
+          tabIndex={filterNav.getTabIndex(filterIndices.completion)}
+          isFilterFocused={filterNav.isFocused(filterIndices.completion)}
         />
 
         {/* Clear filters */}
         {hasFilters && (
           <button
+            ref={filterNav.registerFilter(filterIndices.clear)}
             onClick={clearAllFilters}
+            tabIndex={filterNav.getTabIndex(filterIndices.clear)}
             aria-label={ARIA_LABELS.CLEAR_ALL_FILTERS}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-sm text-slate-400 hover:text-slate-200 flex-shrink-0"
+            className={`filter-button flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-sm text-slate-400 hover:text-slate-200 flex-shrink-0 rounded-lg transition-all duration-200 ${
+              filterNav.isFocused(filterIndices.clear) ? "filter-focused" : ""
+            }`}
           >
             <X size={16} aria-hidden="true" />
             <span className="hidden sm:inline">Clear</span>
