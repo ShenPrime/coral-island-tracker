@@ -11,6 +11,7 @@ import { KeyboardNavigationProvider } from "@/context/KeyboardNavigationContext"
 import { useStore } from "@/store/useStore";
 import { initSession } from "@/lib/session";
 import { useCategories, useSaveSlots } from "@/hooks/useQueries";
+import { usePrefetchAll } from "@/hooks/usePrefetchAll";
 
 function App() {
   const { setCategories, currentSaveId, setCurrentSaveId } = useStore();
@@ -35,6 +36,9 @@ function App() {
   // Use React Query hooks for data fetching (only when session is ready)
   const { data: categories } = useCategories();
   const { data: saves } = useSaveSlots();
+
+  // Prefetch all data in the background for instant navigation
+  usePrefetchAll();
 
   // Sync categories to store for sidebar access
   useEffect(() => {

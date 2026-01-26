@@ -1,7 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "@/store/useStore";
-import { getAltarDetail, updateTempleProgress } from "@/lib/api";
+import { updateTempleProgress } from "@/lib/api";
+import { useAltarDetail, queryKeys } from "@/hooks/useQueries";
 import { OfferingSection } from "@/components/OfferingSection";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
@@ -26,34 +28,18 @@ const altarColors: Record<string, string> = {
 export function AltarDetail() {
   const { altarSlug } = useParams<{ altarSlug: string }>();
   const { currentSaveId } = useStore();
-  const [altar, setAltar] = useState<AltarWithOfferings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const loadAltar = useCallback(async () => {
-    if (!currentSaveId || !altarSlug) return;
+  // Use React Query for caching
+  const { data: altar, isLoading, error } = useAltarDetail(currentSaveId, altarSlug);
 
-    try {
-      const data = await getAltarDetail(currentSaveId, altarSlug);
-      setAltar(data);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to load altar:", err);
-      setError("Failed to load altar data");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentSaveId, altarSlug]);
+  const handleToggleOffered = useCallback(async (requirementId: number, offered: boolean) => {
+    if (!currentSaveId || !altarSlug || !altar) return;
 
-  useEffect(() => {
-    loadAltar();
-  }, [loadAltar]);
-
-  const handleToggleOffered = async (requirementId: number, offered: boolean) => {
-    if (!currentSaveId || !altar) return;
-
-    // Optimistic update
-    setAltar((prev) => {
+    // Optimistic update - directly update the cache
+    const queryKey = queryKeys.altarDetail(currentSaveId, altarSlug);
+    
+    queryClient.setQueryData<AltarWithOfferings>(queryKey, (prev) => {
       if (!prev) return prev;
       
       const updatedOfferings = prev.offerings.map((offering) => {
@@ -81,14 +67,32 @@ export function AltarDetail() {
       };
     });
 
+    // Also update the temple overview cache to keep counts in sync
+    const overviewKey = queryKeys.templeOverview(currentSaveId);
+    queryClient.setQueryData(overviewKey, (prev: any) => {
+      if (!prev) return prev;
+      
+      const delta = offered ? 1 : -1;
+      return {
+        ...prev,
+        offered_items: prev.offered_items + delta,
+        altars: prev.altars.map((a: any) => 
+          a.slug === altarSlug 
+            ? { ...a, offered_items: a.offered_items + delta }
+            : a
+        ),
+      };
+    });
+
     try {
       await updateTempleProgress(currentSaveId, requirementId, offered);
     } catch (err) {
       console.error("Failed to update progress:", err);
-      // Revert on error
-      loadAltar();
+      // Revert on error by invalidating the cache (will use stale data until manual refresh)
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: overviewKey });
     }
-  };
+  }, [currentSaveId, altarSlug, altar, queryClient]);
 
   // Keyboard navigation for offerings and items
   const {
@@ -106,11 +110,11 @@ export function AltarDetail() {
     enabled: !!altar,
   });
 
-if (!currentSaveId) {
+  if (!currentSaveId) {
     return <NoSaveSlotWarning message="Please select a save slot first" />;
   }
 
-  if (loading) {
+  if (isLoading) {
     return <PageLoader />;
   }
 
@@ -127,7 +131,7 @@ if (!currentSaveId) {
         <div className="card text-center py-12">
           <AlertCircle size={48} className="mx-auto text-coral-400 mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Error Loading Altar</h2>
-          <p className="text-slate-400">{error || "Altar not found"}</p>
+          <p className="text-slate-400">{error instanceof Error ? error.message : "Altar not found"}</p>
         </div>
       </div>
     );

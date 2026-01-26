@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
-import { getSaveSlot } from "@/lib/api";
+import { useSaveSlot } from "@/hooks/useQueries";
 import {
   Fish,
   Bug,
@@ -15,7 +14,6 @@ import {
   Rabbit,
   Leaf,
 } from "lucide-react";
-import type { CategoryStats } from "@coral-tracker/shared";
 
 const categoryIcons: Record<string, { sm: React.ReactNode; lg: React.ReactNode }> = {
   fish: { sm: <Fish size={20} />, lg: <Fish size={24} /> },
@@ -31,39 +29,14 @@ const categoryIcons: Record<string, { sm: React.ReactNode; lg: React.ReactNode }
 
 export function Dashboard() {
   const { currentSaveId } = useStore();
-  const [stats, setStats] = useState<{
-    total_items: number;
-    completed_items: number;
-    completion_percentage: number;
-    by_category: CategoryStats[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: saveSlot, isLoading } = useSaveSlot(currentSaveId);
+  const stats = saveSlot?.stats ?? null;
 
-  useEffect(() => {
-    async function loadStats() {
-      if (!currentSaveId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const saveData = await getSaveSlot(currentSaveId);
-        setStats(saveData.stats);
-      } catch (error) {
-        console.error("Failed to load stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadStats();
-  }, [currentSaveId]);
-
-if (!currentSaveId) {
+  if (!currentSaveId) {
     return <NoSaveSlotWarning message="Create or select a save slot to start tracking your progress" />;
   }
 
-  if (loading) {
+  if (isLoading) {
     return <PageLoader />;
   }
 
