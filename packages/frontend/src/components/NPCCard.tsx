@@ -74,6 +74,21 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
     onShowDetails?.();
   };
 
+  const handleCardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onShowDetails?.();
+    }
+  };
+
+  const handleInfoKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      onShowDetails?.();
+    }
+  };
+
   // Card style based on relationship status
   const getCardStyle = () => {
     if (npc.is_max_hearts) {
@@ -94,13 +109,17 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
   return (
     <>
       <div
+        role="button"
+        tabIndex={0}
         className={`
           card cursor-pointer select-none p-4 sm:p-6 h-full
           transform-gpu
           hover:scale-[1.02] hover:-translate-y-1
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ocean-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deepsea-900
           ${getCardStyle()}
         `}
         onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
       >
         <div className="flex items-start gap-3 sm:gap-4">
           {/* NPC Portrait */}
@@ -227,8 +246,9 @@ export const NPCCard = memo(function NPCCard({ npc, onIncrement, onDecrement, on
             {/* Info button */}
             <button
               onClick={handleInfoClick}
+              onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors"
-              title="More info"
+              aria-label={`View details for ${npc.name}`}
             >
               <Info size={16} />
             </button>

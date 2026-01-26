@@ -144,7 +144,7 @@ function SearchAutocomplete({ items, value, onChange, onSelectItem }: SearchAuto
         size={18}
         className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10"
       />
-      <input
+<input
         ref={inputRef}
         type="text"
         placeholder="Search items..."
@@ -154,6 +154,7 @@ function SearchAutocomplete({ items, value, onChange, onSelectItem }: SearchAuto
         onKeyDown={handleKeyDown}
         className="input pl-10"
         autoComplete="off"
+        aria-label="Search items"
       />
 
       {/* Autocomplete dropdown */}

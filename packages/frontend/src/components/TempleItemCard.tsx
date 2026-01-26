@@ -27,10 +27,27 @@ export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
     onToggleOffered(item.id, willOffer);
   };
 
-  const handleInfoClick = (e: React.MouseEvent) => {
+const handleInfoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (hasLinkedItem) {
       setShowModal(true);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
+  const handleInfoKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (hasLinkedItem) {
+        setShowModal(true);
+      }
     }
   };
 
@@ -54,19 +71,25 @@ export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
 
   return (
     <>
-      <div
+<div
+        role="button"
+        tabIndex={0}
+        aria-pressed={item.offered}
         className={`
           card cursor-pointer select-none p-4
           transform-gpu
           hover:scale-[1.02] hover:-translate-y-0.5
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ocean-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deepsea-900
           ${item.offered ? "completed-card" : ""}
           ${justOffered ? "animate-card-complete" : ""}
         `}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
         <div className="flex items-start gap-3">
-          {/* Offered Checkbox */}
+{/* Offered Checkbox (visual only - card is the interactive element) */}
           <div
+            aria-hidden="true"
             className={`
               w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0
               transform-gpu
@@ -163,12 +186,13 @@ export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
             )}
           </div>
 
-          {/* Info button (only if linked item exists) */}
+{/* Info button (only if linked item exists) */}
           {hasLinkedItem && (
             <button
               onClick={handleInfoClick}
+              onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors flex-shrink-0"
-              title="More info"
+              aria-label={`View details for ${item.item_name}`}
             >
               <Info size={16} />
             </button>

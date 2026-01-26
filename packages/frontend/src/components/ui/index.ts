@@ -6,4 +6,4 @@
 export { ItemImage } from "./ItemImage";
 export { LoadingSpinner, PageLoader } from "./LoadingSpinner";
 export { NoSaveSlotWarning } from "./NoSaveSlotWarning";
-export { Modal, ModalHeader, ModalBody } from "./Modal";
+export { Modal, ModalHeader, ModalBody, useModalContext } from "./Modal";

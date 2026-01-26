@@ -37,7 +37,7 @@ export const ItemCard = memo(function ItemCard({
   const isTempleRequirement = templeStatus?.is_temple_requirement ?? false;
   const templeRequirements = templeStatus?.requirements ?? [];
 
-  const handleClick = () => {
+const handleClick = () => {
     if (onToggle) {
       const willComplete = !item.completed;
       if (willComplete) {
@@ -48,9 +48,24 @@ export const ItemCard = memo(function ItemCard({
     }
   };
 
-const handleInfoClick = (e: React.MouseEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
+  const handleInfoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onShowDetails?.();
+  };
+
+  const handleInfoKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      onShowDetails?.();
+    }
   };
 
   // Get rarity styles if item has rarity
@@ -59,20 +74,26 @@ const handleInfoClick = (e: React.MouseEvent) => {
   return (
     <>
 <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={item.completed}
         className={`
           card cursor-pointer select-none p-4 sm:p-6 h-full
           transform-gpu
           hover:scale-[1.02] hover:-translate-y-1
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ocean-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deepsea-900
           ${item.completed ? "completed-card" : ""}
           ${justCompleted ? "animate-card-complete" : ""}
           ${rarityStyle ? rarityStyle.border : ""}
           ${rarityStyle ? (item.completed ? rarityStyle.glowCompleted : rarityStyle.glow) : ""}
         `}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
         <div className="flex items-start gap-3 sm:gap-4">
-          {/* Checkbox */}
-<div
+{/* Checkbox (visual only - card is the interactive element) */}
+          <div
+            aria-hidden="true"
             className={`
               w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0
               transform-gpu
@@ -290,11 +311,12 @@ const handleInfoClick = (e: React.MouseEvent) => {
               <span className="text-xs sm:text-sm font-semibold text-sand-300">{item.base_price}g</span>
             )}
             
-            {/* Info button */}
+{/* Info button */}
             <button
               onClick={handleInfoClick}
+              onKeyDown={handleInfoKeyDown}
               className="p-1.5 text-slate-400 hover:text-ocean-300 hover:bg-ocean-800/50 rounded-lg transition-colors"
-              title="More info"
+              aria-label={`View details for ${item.name}`}
             >
               <Info size={16} />
             </button>

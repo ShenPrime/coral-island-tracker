@@ -82,13 +82,16 @@ export function SaveSlots() {
           Create New Save Slot
         </h2>
         <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <label htmlFor="new-save-name" className="sr-only">Save slot name</label>
           <input
+            id="new-save-name"
             type="text"
             placeholder="Enter save name (e.g., 'Main Farm')"
             value={newSaveName}
             onChange={(e) => setNewSaveName(e.target.value)}
             className="input flex-1 text-sm sm:text-base"
             disabled={createSaveMutation.isPending}
+            aria-label="Save slot name"
           />
           <button 
             type="submit" 
