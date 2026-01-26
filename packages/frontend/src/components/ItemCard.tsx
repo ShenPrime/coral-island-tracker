@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Check, MapPin, Clock, Cloud, Sparkles, ImageIcon, Info, Gift, Package, Sun } from "lucide-react";
+import { Check, MapPin, Clock, Cloud, Sparkles, ImageIcon, Info, Gift, Package, Sun, Sprout, Cog } from "lucide-react";
 import type { Item, Season, Rarity, ItemTempleStatus } from "@coral-tracker/shared";
 import { ItemModal } from "./ItemModal";
 
 interface ItemCardProps {
   item: Item & { completed?: boolean; notes?: string | null };
+  categorySlug?: string;
   onToggle?: (itemId: number, completed: boolean) => void;
   showDetails?: boolean;
   templeStatus?: ItemTempleStatus;
@@ -64,7 +65,7 @@ const seasonColors: Record<Season, string> = {
 // "Any" badge style for items available any season/time
 const anyBadgeStyle = "bg-ocean-800/50 text-ocean-300 italic border border-ocean-600/30";
 
-export function ItemCard({ item, onToggle, showDetails = true, templeStatus, onToggleOffered }: ItemCardProps) {
+export function ItemCard({ item, categorySlug, onToggle, showDetails = true, templeStatus, onToggleOffered }: ItemCardProps) {
   const [justCompleted, setJustCompleted] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
@@ -231,8 +232,9 @@ export function ItemCard({ item, onToggle, showDetails = true, templeStatus, onT
                       )}
                     </div>
 
-                    {/* Locations */}
-                    {item.locations && item.locations.length > 0 && (
+                    {/* Locations - hide for crops and artisan products */}
+                    {item.locations && item.locations.length > 0 && 
+                     categorySlug !== 'crops' && categorySlug !== 'artisan-products' && (
                       <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
                         <MapPin size={12} className="flex-shrink-0 mt-0.5 text-coral-400 sm:hidden" />
                         <MapPin size={14} className="flex-shrink-0 mt-0.5 text-coral-400 hidden sm:block" />
@@ -240,16 +242,56 @@ export function ItemCard({ item, onToggle, showDetails = true, templeStatus, onT
                       </div>
                     )}
 
-                    {/* Time */}
-                    <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
-                      <Clock size={12} className="flex-shrink-0 mt-0.5 text-sand-400 sm:hidden" />
-                      <Clock size={14} className="flex-shrink-0 mt-0.5 text-sand-400 hidden sm:block" />
-                      {item.time_of_day && item.time_of_day.length > 0 ? (
-                        <span>{item.time_of_day.join(", ")}</span>
-                      ) : (
-                        <span className="italic text-ocean-400/60">Any Time</span>
-                      )}
-                    </div>
+                    {/* Category-specific info (replaces generic Time of Day) */}
+                    {categorySlug === 'crops' ? (
+                      // Crops: Show growth time
+                      itemMetadata.growth_days != null && (
+                        <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                          <Sprout size={12} className="flex-shrink-0 mt-0.5 text-palm-400 sm:hidden" />
+                          <Sprout size={14} className="flex-shrink-0 mt-0.5 text-palm-400 hidden sm:block" />
+                          <span>{String(itemMetadata.growth_days)} days</span>
+                        </div>
+                      )
+                    ) : categorySlug === 'artisan-products' ? (
+                      // Artisan Products: Show equipment, input, and processing time
+                      <>
+                        {itemMetadata.equipment && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Cog size={12} className="flex-shrink-0 mt-0.5 text-ocean-400 sm:hidden" />
+                            <Cog size={14} className="flex-shrink-0 mt-0.5 text-ocean-400 hidden sm:block" />
+                            <span>{String(itemMetadata.equipment)}</span>
+                          </div>
+                        )}
+                        {itemMetadata.input && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Package size={12} className="flex-shrink-0 mt-0.5 text-coral-400 sm:hidden" />
+                            <Package size={14} className="flex-shrink-0 mt-0.5 text-coral-400 hidden sm:block" />
+                            <span>From: {String(itemMetadata.input)}</span>
+                          </div>
+                        )}
+                        {itemMetadata.processing_time && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Clock size={12} className="flex-shrink-0 mt-0.5 text-sand-400 sm:hidden" />
+                            <Clock size={14} className="flex-shrink-0 mt-0.5 text-sand-400 hidden sm:block" />
+                            <span>{String(itemMetadata.processing_time)}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : categorySlug === 'forageables' ? (
+                      // Forageables: Hide time of day entirely (not relevant)
+                      null
+                    ) : (
+                      // Default: Show time of day (fish, insects, critters, etc.)
+                      <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                        <Clock size={12} className="flex-shrink-0 mt-0.5 text-sand-400 sm:hidden" />
+                        <Clock size={14} className="flex-shrink-0 mt-0.5 text-sand-400 hidden sm:block" />
+                        {item.time_of_day && item.time_of_day.length > 0 ? (
+                          <span>{item.time_of_day.join(", ")}</span>
+                        ) : (
+                          <span className="italic text-ocean-400/60">Any Time</span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Weather */}
                     {item.weather && item.weather.length > 0 && (

@@ -298,7 +298,8 @@ export function TrackCategory() {
             {filteredItems.map((item) => (
               <ItemCard 
                 key={item.id} 
-                item={item} 
+                item={item}
+                categorySlug={slug}
                 onToggle={handleToggle}
                 templeStatus={templeStatus[item.id]}
                 onToggleOffered={(requirementId, offered) => handleToggleOffered(item.id, requirementId, offered)}
