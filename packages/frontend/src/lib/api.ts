@@ -10,6 +10,7 @@ import type {
   TempleOverview,
   AltarWithOfferings,
   ItemTempleStatus,
+  UpdateNPCProgressRequest,
 } from "@coral-tracker/shared";
 import { getSessionId } from "./session";
 
@@ -187,4 +188,37 @@ export async function getItemsTempleStatus(
   return fetchApi<Record<number, ItemTempleStatus>>(
     `/temple/items-status?saveId=${saveId}&itemIds=${itemIds.join(",")}`
   );
+}
+
+// NPC Progress (protected - requires session)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getNPCs(saveId: number): Promise<any[]> {
+  return fetchApi(`/npcs/${saveId}`);
+}
+
+export async function getNPCStats(saveId: number): Promise<unknown> {
+  return fetchApi(`/npcs/${saveId}/stats`);
+}
+
+export async function updateNPCProgress(
+  saveId: number,
+  npcId: number,
+  data: UpdateNPCProgressRequest
+): Promise<void> {
+  await fetchApi(`/npcs/${saveId}/${npcId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function incrementNPCHearts(saveId: number, npcId: number): Promise<void> {
+  await fetchApi(`/npcs/${saveId}/${npcId}/increment`, {
+    method: "POST",
+  });
+}
+
+export async function decrementNPCHearts(saveId: number, npcId: number): Promise<void> {
+  await fetchApi(`/npcs/${saveId}/${npcId}/decrement`, {
+    method: "POST",
+  });
 }

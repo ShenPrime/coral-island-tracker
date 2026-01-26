@@ -273,6 +273,66 @@ async function fetchPageHtml(title: string): Promise<string | null> {
 }
 
 /**
+ * Fetch list of sections from a wiki page
+ * Returns array of { index, line } where line is section title like "Gifts"
+ */
+async function fetchPageSections(title: string): Promise<Array<{ index: string; line: string }>> {
+  const params = new URLSearchParams({
+    action: "parse",
+    page: title,
+    format: "json",
+    prop: "sections",
+  });
+
+  await delay(DELAY_MS);
+
+  try {
+    const response = await fetch(`${API_URL}?${params}`);
+    if (!response.ok) return [];
+
+    const data = (await response.json()) as {
+      parse?: { sections?: Array<{ index: string; line: string }> };
+      error?: { code: string };
+    };
+
+    if (data.error) return [];
+    return data.parse?.sections || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch HTML content of a specific section from a wiki page
+ */
+async function fetchPageSectionHtml(title: string, sectionIndex: string): Promise<string | null> {
+  const params = new URLSearchParams({
+    action: "parse",
+    page: title,
+    format: "json",
+    prop: "text",
+    section: sectionIndex,
+  });
+
+  await delay(DELAY_MS);
+
+  try {
+    const response = await fetch(`${API_URL}?${params}`);
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as {
+      parse?: { text?: { "*"?: string } };
+      error?: { code: string };
+    };
+
+    if (data.error) return null;
+    return data.parse?.text?.["*"] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch item details from individual wiki page with retry
  */
 async function fetchItemDetails(
@@ -1749,6 +1809,421 @@ async function scrapeLakeTemple(_fastMode: boolean): Promise<ScrapedItem[]> {
   return items;
 }
 
+// ============ NPC Scraper ============
+
+/**
+ * Parse NPC birthday from infobox
+ * Returns { season, day } or null
+ */
+function parseNPCBirthday(html: string): { season: string; day: number } | null {
+  // The wiki infobox can use either <td> (horizontal layout) or <div> (vertical layout)
+  // Try multiple patterns to find the birthday data
+  const patterns = [
+    // Pattern 1: Direct td element with data-source="birthday" (horizontal table layout)
+    /<td[^>]*data-source="birthday"[^>]*>([\s\S]*?)<\/td>/i,
+    // Pattern 2: Nested in div with pi-data-value class (vertical layout)
+    /data-source="birthday"[^>]*>[\s\S]*?<div[^>]*class="[^"]*pi-data-value[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    // Pattern 3: Any element with data-source="birthday" followed by content
+    /data-source="birthday"[^>]*>([^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      const text = stripHtml(match[1]).toLowerCase().trim();
+      
+      // Parse patterns like "Spring 15", "Summer 3", "Fall 28", "Winter 1"
+      const seasonMatch = text.match(/(spring|summer|fall|winter)\s*(\d+)/i);
+      if (seasonMatch) {
+        return {
+          season: seasonMatch[1]!.toLowerCase(),
+          day: parseInt(seasonMatch[2]!, 10),
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Parse NPC residence from infobox or categories
+ */
+function parseNPCResidence(html: string, categories: string[]): string | null {
+  // Try multiple patterns for residence/residency
+  const patterns = [
+    // Pattern 1: div with data-source and pi-data-value class
+    /data-source="(?:residency|residence|address|home)"[^>]*>[\s\S]*?<div[^>]*class="[^"]*pi-data-value[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    // Pattern 2: td element with data-source
+    /<td[^>]*data-source="(?:residency|residence|address|home)"[^>]*>([\s\S]*?)<\/td>/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      const residence = stripHtml(match[1]).trim();
+      if (residence && residence.length < 100) {
+        return residence;
+      }
+    }
+  }
+  
+  // Try categories like "Lives at Fishensips"
+  for (const cat of categories) {
+    const livesMatch = cat.match(/Lives at (.+)/i);
+    if (livesMatch) {
+      return livesMatch[1]!.trim();
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Parse NPC gender from categories
+ */
+function parseNPCGender(categories: string[]): string {
+  for (const cat of categories) {
+    const lower = cat.toLowerCase();
+    if (lower.includes("female")) return "female";
+    if (lower.includes("male") && !lower.includes("female")) return "male";
+  }
+  return "unknown";
+}
+
+/**
+ * Parse NPC character type from categories
+ * Order matters - check more specific categories first
+ */
+function parseNPCCharacterType(categories: string[]): string {
+  for (const cat of categories) {
+    const lower = cat.toLowerCase();
+    // Check specific categories first
+    if (lower.includes("townie")) return "townie";
+    if (lower.includes("merfolk") || lower.includes("merperson")) return "merperson";
+    if (lower.includes("giant")) return "giant";
+    if (lower.includes("adoptable pet")) return "pet";
+    if (lower.includes("stranger")) return "stranger";
+  }
+  return "other";
+}
+
+/**
+ * Check if NPC is a marriage candidate from categories
+ */
+function isMarriageCandidate(categories: string[]): boolean {
+  for (const cat of categories) {
+    if (cat.toLowerCase().includes("marriage candidate")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Parse gift preferences from the Gifts section HTML (wikitable format)
+ * Excludes universally liked/loved items (in collapsible sections)
+ * Returns { loved, liked, disliked, hated } arrays
+ */
+function parseGiftPreferencesFromSection(html: string): {
+  loved: string[];
+  liked: string[];
+  disliked: string[];
+  hated: string[];
+} {
+  const gifts: {
+    loved: string[];
+    liked: string[];
+    disliked: string[];
+    hated: string[];
+  } = {
+    loved: [],
+    liked: [],
+    disliked: [],
+    hated: [],
+  };
+
+  // The gifts section uses a wikitable with rows for each category
+  // Each row has: <th> with category icon (data-image-key="Loved_gift.png") and <td> with items
+  
+  // Split HTML into rows
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  
+  while ((rowMatch = rowRegex.exec(html)) !== null) {
+    const rowHtml = rowMatch[1]!;
+    
+    // Determine category from the header cell's icon
+    let category: "loved" | "liked" | "disliked" | "hated" | null = null;
+    
+    // Check for category icon in data-image-key attribute
+    if (rowHtml.includes('data-image-key="Loved_gift.png"') || 
+        rowHtml.includes('data-image-name="Loved gift.png"') ||
+        (rowHtml.includes('>Loved<') || rowHtml.includes('Loved</span>'))) {
+      category = "loved";
+    } else if (rowHtml.includes('data-image-key="Liked_gift.png"') || 
+               rowHtml.includes('data-image-name="Liked gift.png"') ||
+               (rowHtml.includes('>Liked<') || rowHtml.includes('Liked</span>'))) {
+      category = "liked";
+    } else if (rowHtml.includes('data-image-key="Disliked_gift.png"') || 
+               rowHtml.includes('data-image-name="Disliked gift.png"') ||
+               (rowHtml.includes('>Disliked<') || rowHtml.includes('Disliked</span>'))) {
+      category = "disliked";
+    } else if (rowHtml.includes('data-image-key="Hated_gift.png"') || 
+               rowHtml.includes('data-image-name="Hated gift.png"') ||
+               (rowHtml.includes('>Hated<') || rowHtml.includes('Hated</span>'))) {
+      category = "hated";
+    }
+    
+    if (!category) continue;
+    
+    // Extract the <td> content (items list)
+    const tdMatch = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/i);
+    if (!tdMatch?.[1]) continue;
+    
+    let itemsHtml = tdMatch[1];
+    
+    // Remove universally liked/loved items (inside collapsible sections)
+    // These are in <div class="ci-collapsible ..."> elements
+    itemsHtml = itemsHtml.replace(/<div[^>]*class="[^"]*ci-collapsible[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>/gi, "");
+    
+    // Also remove by data-expandtext pattern (backup)
+    itemsHtml = itemsHtml.replace(/<div[^>]*data-expandtext="Universal[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>/gi, "");
+    
+    // Extract item names from title attributes of links
+    const itemRegex = /<a[^>]*title="([^"]+)"[^>]*>/gi;
+    let itemMatch;
+    const foundItems = new Set<string>();
+    
+    while ((itemMatch = itemRegex.exec(itemsHtml)) !== null) {
+      const itemName = itemMatch[1]!.trim();
+      // Filter out non-item links (categories, special pages, etc.)
+      if (itemName && 
+          !itemName.includes(":") && 
+          !itemName.startsWith("File:") &&
+          !itemName.startsWith("Category:") &&
+          itemName.length < 50) {
+        foundItems.add(itemName);
+      }
+    }
+    
+    // Add to appropriate category
+    gifts[category].push(...foundItems);
+  }
+  
+  // Deduplicate (in case of any duplicates)
+  gifts.loved = [...new Set(gifts.loved)];
+  gifts.liked = [...new Set(gifts.liked)];
+  gifts.disliked = [...new Set(gifts.disliked)];
+  gifts.hated = [...new Set(gifts.hated)];
+  
+  return gifts;
+}
+
+/**
+ * Extract item names from HTML (from links or plain text)
+ */
+function extractItemNames(html: string): string[] {
+  const items: string[] = [];
+  
+  // Extract from links first
+  const linkRegex = /<a[^>]*title="([^"]+)"[^>]*>/gi;
+  let linkMatch;
+  while ((linkMatch = linkRegex.exec(html)) !== null) {
+    const title = linkMatch[1]!.trim();
+    // Filter out non-item links (pages, categories, etc.)
+    if (title && !title.includes(":") && title.length < 50) {
+      items.push(title);
+    }
+  }
+  
+  // If no links found, try comma-separated text
+  if (items.length === 0) {
+    const text = stripHtml(html);
+    const parts = text.split(/[,\u2022\n]+/);
+    for (const part of parts) {
+      const cleaned = part.trim();
+      if (cleaned && cleaned.length > 1 && cleaned.length < 50 && !cleaned.match(/^\d+$/)) {
+        items.push(cleaned);
+      }
+    }
+  }
+  
+  return items;
+}
+
+/**
+ * Scrape NPCs - characters, marriage candidates, merfolk, etc.
+ */
+async function scrapeNPCs(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const processedNames = new Set<string>();
+  
+  // Skip non-character pages
+  const skipItems = new Set([
+    "Characters",
+    "Character",
+    "NPC",
+    "NPCs",
+    "Marriage",
+    "Marriage candidates",
+    "Gifts",
+    "Gift preferences",
+    "Friendship",
+    "Romance",
+    "Dating",
+    "Children",
+    "Spouse",
+  ]);
+
+  console.log("  Fetching character list from Category:Characters...");
+  const characterNames = await fetchCategoryMembers("Category:Characters");
+  
+  // Filter out non-character pages
+  const validCharacters = [...characterNames].filter(
+    (name) => !skipItems.has(name) && !name.startsWith("Category:")
+  );
+  console.log(`  Found ${validCharacters.length} characters`);
+
+  // Fetch marriage candidates to flag them
+  console.log("  Fetching marriage candidates...");
+  const marriageCandidates = await fetchCategoryMembers("Category:Marriage_candidates");
+  console.log(`  Found ${marriageCandidates.size} marriage candidates`);
+
+  // Fetch character type categories
+  console.log("  Fetching character type categories...");
+  const townies = await fetchCategoryMembers("Category:Townie_characters");
+  const merfolk = await fetchCategoryMembers("Category:Merfolk");
+  const children = await fetchCategoryMembers("Category:Child_characters");
+
+  if (fastMode) {
+    // Fast mode: use category data only
+    for (const name of validCharacters) {
+      if (processedNames.has(name)) continue;
+      processedNames.add(name);
+
+      let characterType = "other";
+      if (townies.has(name)) characterType = "townie";
+      else if (merfolk.has(name)) characterType = "merperson";
+      else if (children.has(name)) characterType = "child";
+
+      const item: ScrapedItem = {
+        name,
+        seasons: [],
+        time_of_day: [],
+        weather: [],
+        locations: [],
+        metadata: {
+          is_marriage_candidate: marriageCandidates.has(name),
+          character_type: characterType,
+        },
+      };
+      items.push(item);
+    }
+    return items;
+  }
+
+  // Full mode: fetch individual pages
+  console.log("  Fetching individual character pages...");
+
+  for (let i = 0; i < validCharacters.length; i++) {
+    const name = validCharacters[i]!;
+    if (processedNames.has(name)) continue;
+    processedNames.add(name);
+
+    showProgress(i + 1, validCharacters.length, name);
+
+    // Fetch page HTML and categories
+    const html = await fetchPageHtml(name);
+    const categories = await fetchPageCategories(name);
+
+    // Determine character type from categories
+    let characterType = parseNPCCharacterType(categories);
+    // Override with pre-fetched category data if available
+    if (townies.has(name)) characterType = "townie";
+    else if (merfolk.has(name)) characterType = "merperson";
+    else if (children.has(name)) characterType = "child";
+
+    // Parse page data
+    let birthday: { season: string; day: number } | null = null;
+    let residence: string | null = null;
+    let gender = "unknown";
+    let imageUrl: string | undefined;
+    let description: string | undefined;
+    let giftPreferences: {
+      loved: string[];
+      liked: string[];
+      disliked: string[];
+      hated: string[];
+    } = { loved: [], liked: [], disliked: [], hated: [] };
+
+    if (html) {
+      birthday = parseNPCBirthday(html);
+      residence = parseNPCResidence(html, categories);
+      gender = parseNPCGender(categories);
+
+      // Parse infobox for image and description
+      const infoboxData = parseInfobox(html);
+      imageUrl = infoboxData.image_url;
+      description = infoboxData.description;
+    }
+
+    // Fetch gift preferences from the Gifts section (separate API call)
+    // This is more reliable than parsing from the main page
+    const sections = await fetchPageSections(name);
+    const giftsSection = sections.find((s) => s.line === "Gifts");
+    
+    if (giftsSection) {
+      const giftsHtml = await fetchPageSectionHtml(name, giftsSection.index);
+      if (giftsHtml) {
+        giftPreferences = parseGiftPreferencesFromSection(giftsHtml);
+      }
+    }
+
+    const metadata: Record<string, unknown> = {
+      is_marriage_candidate: marriageCandidates.has(name) || isMarriageCandidate(categories),
+      character_type: characterType,
+      gender,
+      wiki_url: `${WIKI_BASE}/wiki/${encodeURIComponent(name.replace(/ /g, "_"))}`,
+    };
+
+    if (birthday) {
+      metadata.birthday_season = birthday.season;
+      metadata.birthday_day = birthday.day;
+    }
+
+    if (residence) {
+      metadata.residence = residence;
+    }
+
+    // Only add gift preferences if we found any
+    if (
+      giftPreferences.loved.length > 0 ||
+      giftPreferences.liked.length > 0 ||
+      giftPreferences.disliked.length > 0 ||
+      giftPreferences.hated.length > 0
+    ) {
+      metadata.gift_preferences = giftPreferences;
+    }
+
+    const item: ScrapedItem = {
+      name,
+      seasons: birthday ? [birthday.season] : [], // Season for birthday filtering
+      time_of_day: [],
+      weather: [],
+      locations: residence ? [residence] : [],
+      image_url: imageUrl,
+      description,
+      metadata,
+    };
+
+    items.push(item);
+  }
+
+  clearProgress();
+  return items;
+}
+
 // ============ Main ============
 
 async function main() {
@@ -1773,6 +2248,7 @@ async function main() {
     gems: scrapeGems,
     forageables: scrapeForageables,
     "artisan-products": scrapeArtisanProducts,
+    npcs: scrapeNPCs,
     // Note: lake-temple is now handled via migration, not scraper
   };
 

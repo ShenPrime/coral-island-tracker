@@ -10,11 +10,13 @@ import {
   PRICE_SORT_LABELS,
   CATEGORY_FILTER_CONFIG,
   DEFAULT_FILTER_CONFIG,
+  CHARACTER_TYPE_LABELS,
   type Season, 
   type TimeOfDay, 
   type Rarity,
   type GrowthTimeBucket,
   type PriceSortOption,
+  type CharacterType,
 } from "@coral-tracker/shared";
 
 // Format rarity for display (super_rare -> "Super Rare")
@@ -413,6 +415,9 @@ interface FilterBarProps {
   availableLocations?: string[];
   availableRarities?: Rarity[];
   availableEquipment?: string[];
+  availableResidences?: string[];
+  availableCharacterTypes?: CharacterType[];
+  availableBirthdaySeasons?: Season[];
   items?: Array<{ id: number; name: string }>;
   locationLabel?: string;
 }
@@ -422,6 +427,9 @@ export function FilterBar({
   availableLocations = [], 
   availableRarities = [], 
   availableEquipment = [],
+  availableResidences = [],
+  availableCharacterTypes = [],
+  availableBirthdaySeasons = [],
   items = [], 
   locationLabel = "Location" 
 }: FilterBarProps) {
@@ -442,10 +450,22 @@ export function FilterBar({
     toggleGrowthTime,
     priceSort,
     setPriceSort,
+    // NPC filters
+    selectedCharacterTypes,
+    toggleCharacterType,
+    selectedResidences,
+    toggleResidence,
+    marriageCandidatesOnly,
+    setMarriageCandidatesOnly,
+    selectedBirthdaySeason,
+    setBirthdaySeason,
     showCompleted,
     setShowCompleted,
     clearAllFilters,
   } = useStore();
+
+  // Check if this is the NPC category
+  const isNPCCategory = categorySlug === "npcs";
 
   // Get filter config for this category
   const config = categorySlug 
@@ -461,6 +481,10 @@ export function FilterBar({
     selectedEquipment.length > 0 ||
     selectedGrowthTime.length > 0 ||
     priceSort !== "none" ||
+    selectedCharacterTypes.length > 0 ||
+    selectedResidences.length > 0 ||
+    marriageCandidatesOnly ||
+    selectedBirthdaySeason !== null ||
     showCompleted !== null;
 
   return (
@@ -548,8 +572,60 @@ export function FilterBar({
           />
         )}
 
-        {/* Price Sort */}
-        {config.showPriceSort && (
+        {/* NPC-specific filters */}
+        {isNPCCategory && (
+          <>
+            {/* Birthday Season filter - only show if we have NPCs with birthdays */}
+            {availableBirthdaySeasons.length > 0 && (
+              <SingleSelectDropdown
+                label="Birthday"
+                options={["Any Season", ...availableBirthdaySeasons]}
+                selected={selectedBirthdaySeason || "Any Season"}
+                onSelect={(s) => setBirthdaySeason(s === "Any Season" ? null : s as Season)}
+                formatOption={(s) => s === "Any Season" ? "Birthday" : s.charAt(0).toUpperCase() + s.slice(1)}
+              />
+            )}
+
+            {/* Character Type filter - only show types that have data */}
+            {availableCharacterTypes.length > 0 && (
+              <MultiSelectDropdown
+                label="Type"
+                options={availableCharacterTypes}
+                selected={selectedCharacterTypes}
+                onToggle={(t) => toggleCharacterType(t as CharacterType)}
+                formatOption={(t) => CHARACTER_TYPE_LABELS[t as CharacterType] || t}
+              />
+            )}
+
+            {/* Residence filter */}
+            {availableResidences.length > 0 && (
+              <MultiSelectDropdown
+                label="Residence"
+                options={availableResidences}
+                selected={selectedResidences}
+                onToggle={toggleResidence}
+                formatOption={(r) => r}
+              />
+            )}
+
+            {/* Marriage Candidates toggle */}
+            <button
+              type="button"
+              onClick={() => setMarriageCandidatesOnly(!marriageCandidatesOnly)}
+              className={`input w-auto text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center gap-2 transition-all duration-200 ${
+                marriageCandidatesOnly 
+                  ? "text-pink-300 border-pink-500/50 bg-pink-500/10" 
+                  : "text-slate-400"
+              }`}
+            >
+              <span className={marriageCandidatesOnly ? "text-pink-400" : ""}>♥</span>
+              <span className="hidden sm:inline">Candidates</span>
+            </button>
+          </>
+        )}
+
+        {/* Price Sort (hide for NPCs) */}
+        {config.showPriceSort && !isNPCCategory && (
           <SingleSelectDropdown
             label="Sort"
             options={[...PRICE_SORT_OPTIONS]}

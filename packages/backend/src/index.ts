@@ -10,6 +10,7 @@ import savesRouter from "./routes/saves";
 import progressRouter from "./routes/progress";
 import templeRouter from "./routes/temple";
 import sessionRouter from "./routes/session";
+import npcsRouter from "./routes/npcs";
 import { rateLimit } from "./middleware/rateLimit";
 import path from "path";
 
@@ -64,6 +65,7 @@ app.route("/api/items", itemsRouter);
 app.route("/api/saves", savesRouter);
 app.route("/api/progress", progressRouter);
 app.route("/api/temple", templeRouter);
+app.route("/api/npcs", npcsRouter);
 
 // Serve frontend static files
 app.use("/*", serveStatic({ root: frontendDist }));

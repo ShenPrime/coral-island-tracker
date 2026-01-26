@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Category, Season, TimeOfDay, Rarity, GrowthTimeBucket, PriceSortOption } from "@coral-tracker/shared";
+import type { Category, Season, TimeOfDay, Rarity, GrowthTimeBucket, PriceSortOption, CharacterType } from "@coral-tracker/shared";
 
 interface AppState {
   // Current save slot
@@ -44,6 +44,21 @@ interface AppState {
   // Price sort
   priceSort: PriceSortOption;
   setPriceSort: (sort: PriceSortOption) => void;
+
+  // NPC-specific filters
+  selectedCharacterTypes: CharacterType[];
+  toggleCharacterType: (type: CharacterType) => void;
+  clearCharacterTypes: () => void;
+
+  selectedResidences: string[];
+  toggleResidence: (residence: string) => void;
+  clearResidences: () => void;
+
+  marriageCandidatesOnly: boolean;
+  setMarriageCandidatesOnly: (value: boolean) => void;
+
+  selectedBirthdaySeason: Season | null;
+  setBirthdaySeason: (season: Season | null) => void;
 
   showCompleted: boolean | null; // null = show all, true = completed only, false = incomplete only
   setShowCompleted: (show: boolean | null) => void;
@@ -136,6 +151,31 @@ export const useStore = create<AppState>()(
       priceSort: "none" as PriceSortOption,
       setPriceSort: (sort) => set({ priceSort: sort }),
 
+      // NPC-specific filters
+      selectedCharacterTypes: [],
+      toggleCharacterType: (type) =>
+        set((state) => ({
+          selectedCharacterTypes: state.selectedCharacterTypes.includes(type)
+            ? state.selectedCharacterTypes.filter((t) => t !== type)
+            : [...state.selectedCharacterTypes, type],
+        })),
+      clearCharacterTypes: () => set({ selectedCharacterTypes: [] }),
+
+      selectedResidences: [],
+      toggleResidence: (residence) =>
+        set((state) => ({
+          selectedResidences: state.selectedResidences.includes(residence)
+            ? state.selectedResidences.filter((r) => r !== residence)
+            : [...state.selectedResidences, residence],
+        })),
+      clearResidences: () => set({ selectedResidences: [] }),
+
+      marriageCandidatesOnly: false,
+      setMarriageCandidatesOnly: (value) => set({ marriageCandidatesOnly: value }),
+
+      selectedBirthdaySeason: null,
+      setBirthdaySeason: (season) => set({ selectedBirthdaySeason: season }),
+
       showCompleted: null,
       setShowCompleted: (show) => set({ showCompleted: show }),
 
@@ -152,6 +192,10 @@ export const useStore = create<AppState>()(
           selectedEquipment: [],
           selectedGrowthTime: [],
           priceSort: "none" as PriceSortOption,
+          selectedCharacterTypes: [],
+          selectedResidences: [],
+          marriageCandidatesOnly: false,
+          selectedBirthdaySeason: null,
           showCompleted: null,
         }),
 

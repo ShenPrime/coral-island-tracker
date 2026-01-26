@@ -3,20 +3,40 @@ import { useParams, Link } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
+import { NPCCard } from "@/components/NPCCard";
 import { ProgressBar } from "@/components/ProgressBar";
-import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress } from "@/lib/api";
+import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress, getNPCs, incrementNPCHearts, decrementNPCHearts, updateNPCProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
 import { 
   FISHING_LOCATIONS, 
   FORAGING_LOCATIONS, 
   RARITIES,
+  SEASONS,
+  CHARACTER_TYPES,
   CATEGORY_FILTER_CONFIG,
   DEFAULT_FILTER_CONFIG,
   getGrowthTimeBucket,
 } from "@coral-tracker/shared";
-import type { Item, Category, ItemTempleStatus, Rarity } from "@coral-tracker/shared";
+import type { Item, Category, ItemTempleStatus, Rarity, NPCMetadata, RelationshipStatus, Season, CharacterType } from "@coral-tracker/shared";
 
 type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
+
+// NPC data type from API
+interface NPCData {
+  id: number;
+  name: string;
+  slug: string;
+  image_url: string | null;
+  description: string | null;
+  seasons: Season[];
+  locations: string[];
+  metadata: NPCMetadata;
+  hearts: number;
+  relationship_status: RelationshipStatus;
+  notes: string | null;
+  max_hearts: number;
+  is_max_hearts: boolean;
+}
 
 // Helper to parse metadata (handles string or object)
 function parseMetadata(metadata: unknown): Record<string, unknown> {
@@ -51,14 +71,27 @@ export function TrackCategory() {
     clearGrowthTime,
     priceSort,
     setPriceSort,
+    // NPC filters
+    selectedCharacterTypes,
+    clearCharacterTypes,
+    selectedResidences,
+    clearResidences,
+    marriageCandidatesOnly,
+    setMarriageCandidatesOnly,
+    selectedBirthdaySeason,
+    setBirthdaySeason,
     showCompleted,
     setShowCompleted,
   } = useStore();
+
+  // Check if this is the NPC category
+  const isNPCCategory = slug === "npcs";
 
   // Track previous slug to detect category changes
   const prevSlugRef = useRef<string | undefined>(undefined);
 
   const [items, setItems] = useState<ItemWithProgress[]>([]);
+  const [npcs, setNPCs] = useState<NPCData[]>([]);
   const [category, setCategory] = useState<(Category & { item_count: number }) | null>(null);
   const [templeStatus, setTempleStatus] = useState<Record<number, ItemTempleStatus>>({});
   const [loading, setLoading] = useState(true);
@@ -68,18 +101,30 @@ export function TrackCategory() {
 
     setLoading(true);
     try {
-      const [itemsData, categoryData] = await Promise.all([
-        getProgressItems(currentSaveId, slug),
-        getCategory(slug),
-      ]);
-      setItems(itemsData);
-      setCategory(categoryData);
+      // Load NPCs differently
+      if (slug === "npcs") {
+        const [npcsData, categoryData] = await Promise.all([
+          getNPCs(currentSaveId),
+          getCategory(slug),
+        ]);
+        setNPCs(npcsData);
+        setItems([]);
+        setCategory(categoryData);
+      } else {
+        const [itemsData, categoryData] = await Promise.all([
+          getProgressItems(currentSaveId, slug),
+          getCategory(slug),
+        ]);
+        setItems(itemsData);
+        setNPCs([]);
+        setCategory(categoryData);
 
-      // Load temple status for all items
-      const itemIds = itemsData.map((item) => item.id);
-      if (itemIds.length > 0) {
-        const status = await getItemsTempleStatus(currentSaveId, itemIds);
-        setTempleStatus(status);
+        // Load temple status for all items
+        const itemIds = itemsData.map((item) => item.id);
+        if (itemIds.length > 0) {
+          const status = await getItemsTempleStatus(currentSaveId, itemIds);
+          setTempleStatus(status);
+        }
       }
     } catch (error) {
       console.error("Failed to load items:", error);
@@ -115,6 +160,12 @@ export function TrackCategory() {
       setShowCompleted(null);
       setPriceSort("none");
 
+      // Clear NPC-specific filters
+      clearCharacterTypes();
+      clearResidences();
+      setMarriageCandidatesOnly(false);
+      setBirthdaySeason(null);
+
       // Clear time filter if new category doesn't support it
       if (!config.showTime) {
         clearTimes();
@@ -127,7 +178,7 @@ export function TrackCategory() {
 
       prevSlugRef.current = slug;
     }
-  }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons]);
+  }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons, clearCharacterTypes, clearResidences, setMarriageCandidatesOnly, setBirthdaySeason]);
 
   const handleToggle = async (itemId: number, completed: boolean) => {
     if (!currentSaveId) return;
@@ -182,6 +233,76 @@ export function TrackCategory() {
     }
   };
 
+  // NPC handlers
+  const handleNPCIncrement = async (npcId: number) => {
+    if (!currentSaveId) return;
+
+    // Optimistic update
+    setNPCs((prev) =>
+      prev.map((npc) =>
+        npc.id === npcId && npc.hearts < npc.max_hearts
+          ? { ...npc, hearts: npc.hearts + 1, is_max_hearts: npc.hearts + 1 >= npc.max_hearts }
+          : npc
+      )
+    );
+
+    try {
+      await incrementNPCHearts(currentSaveId, npcId);
+    } catch (error) {
+      console.error("Failed to increment NPC hearts:", error);
+      loadItems();
+    }
+  };
+
+  const handleNPCDecrement = async (npcId: number) => {
+    if (!currentSaveId) return;
+
+    // Optimistic update
+    setNPCs((prev) =>
+      prev.map((npc) =>
+        npc.id === npcId && npc.hearts > 0
+          ? { ...npc, hearts: npc.hearts - 1, is_max_hearts: false }
+          : npc
+      )
+    );
+
+    try {
+      await decrementNPCHearts(currentSaveId, npcId);
+    } catch (error) {
+      console.error("Failed to decrement NPC hearts:", error);
+      loadItems();
+    }
+  };
+
+  const handleNPCUpdateProgress = async (npcId: number, hearts: number, status: RelationshipStatus) => {
+    if (!currentSaveId) return;
+
+    // Optimistic update
+    setNPCs((prev) =>
+      prev.map((npc) => {
+        if (npc.id !== npcId) return npc;
+        
+        const isMarriageCandidate = npc.metadata?.is_marriage_candidate || false;
+        const newMaxHearts = isMarriageCandidate && status === "married" ? 14 : 10;
+        
+        return {
+          ...npc,
+          hearts,
+          relationship_status: status,
+          max_hearts: newMaxHearts,
+          is_max_hearts: hearts >= newMaxHearts,
+        };
+      })
+    );
+
+    try {
+      await updateNPCProgress(currentSaveId, npcId, { hearts, relationship_status: status });
+    } catch (error) {
+      console.error("Failed to update NPC progress:", error);
+      loadItems();
+    }
+  };
+
   // Get available locations based on category
   const availableLocations = 
     slug === "fish" ? [...FISHING_LOCATIONS] : 
@@ -209,6 +330,41 @@ export function TrackCategory() {
     });
     return Array.from(equipmentSet).sort();
   }, [items, slug]);
+
+  // Get available residences from NPCs
+  const availableResidences = useMemo(() => {
+    if (!isNPCCategory) return [];
+    const residenceSet = new Set<string>();
+    npcs.forEach(npc => {
+      const residence = npc.metadata?.residence || npc.locations?.[0];
+      if (residence) residenceSet.add(residence);
+    });
+    return Array.from(residenceSet).sort();
+  }, [npcs, isNPCCategory]);
+
+  // Get available character types from NPCs (only show types that have data)
+  const availableCharacterTypes = useMemo(() => {
+    if (!isNPCCategory) return [] as CharacterType[];
+    const typeSet = new Set<CharacterType>();
+    npcs.forEach(npc => {
+      const charType = (npc.metadata?.character_type || "other") as CharacterType;
+      typeSet.add(charType);
+    });
+    // Return in standard order from CHARACTER_TYPES, filtered to only those present
+    return CHARACTER_TYPES.filter((t) => typeSet.has(t));
+  }, [npcs, isNPCCategory]);
+
+  // Get available birthday seasons from NPCs
+  const availableBirthdaySeasons = useMemo(() => {
+    if (!isNPCCategory) return [] as Season[];
+    const seasonSet = new Set<Season>();
+    npcs.forEach(npc => {
+      const birthdaySeason = npc.metadata?.birthday_season as Season | undefined;
+      if (birthdaySeason) seasonSet.add(birthdaySeason);
+    });
+    // Return in standard season order
+    return SEASONS.filter((s) => seasonSet.has(s));
+  }, [npcs, isNPCCategory]);
 
   // Filter items based on all filters
   const filteredItems = items.filter((item) => {
@@ -287,6 +443,53 @@ export function TrackCategory() {
     return true;
   });
 
+  // Filter NPCs
+  const filteredNPCs = npcs.filter((npc) => {
+    // Search filter
+    if (searchQuery && !npc.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+
+    // Birthday season filter
+    if (selectedBirthdaySeason) {
+      const birthdaySeason = npc.metadata?.birthday_season;
+      if (birthdaySeason !== selectedBirthdaySeason) {
+        return false;
+      }
+    }
+
+    // Character type filter
+    if (selectedCharacterTypes.length > 0) {
+      const characterType = npc.metadata?.character_type || "other";
+      if (!selectedCharacterTypes.includes(characterType as CharacterType)) {
+        return false;
+      }
+    }
+
+    // Residence filter
+    if (selectedResidences.length > 0) {
+      const residence = npc.metadata?.residence || npc.locations?.[0];
+      if (!residence || !selectedResidences.includes(residence)) {
+        return false;
+      }
+    }
+
+    // Marriage candidates only filter
+    if (marriageCandidatesOnly) {
+      if (!npc.metadata?.is_marriage_candidate) {
+        return false;
+      }
+    }
+
+    // Completion filter (max hearts reached)
+    if (showCompleted !== null) {
+      if (showCompleted && !npc.is_max_hearts) return false;
+      if (!showCompleted && npc.is_max_hearts) return false;
+    }
+
+    return true;
+  });
+
   // Sort items based on priceSort
   const sortedItems = useMemo(() => {
     if (priceSort === "none") return filteredItems;
@@ -300,8 +503,15 @@ export function TrackCategory() {
     });
   }, [filteredItems, priceSort]);
 
-  const completedCount = items.filter((i) => i.completed).length;
-  const sortedCompletedCount = sortedItems.filter((i) => i.completed).length;
+  // Calculate completion counts
+  const completedCount = isNPCCategory 
+    ? npcs.filter((n) => n.is_max_hearts).length
+    : items.filter((i) => i.completed).length;
+  const totalCount = isNPCCategory ? npcs.length : items.length;
+  const filteredCompletedCount = isNPCCategory
+    ? filteredNPCs.filter((n) => n.is_max_hearts).length
+    : sortedItems.filter((i) => i.completed).length;
+  const filteredCount = isNPCCategory ? filteredNPCs.length : sortedItems.length;
 
   if (!currentSaveId) {
     return (
@@ -344,13 +554,13 @@ export function TrackCategory() {
           )}
         </div>
 
-        {/* Progress */}
+      {/* Progress */}
         <div className="card p-4 sm:p-6">
           <ProgressBar
             value={completedCount}
-            max={items.length}
+            max={totalCount}
             label={`${category?.name} Progress`}
-            color={completedCount === items.length ? "green" : "ocean"}
+            color={completedCount === totalCount ? "green" : "ocean"}
           />
         </div>
       </div>
@@ -361,22 +571,46 @@ export function TrackCategory() {
         availableLocations={availableLocations}
         availableRarities={availableRarities}
         availableEquipment={availableEquipment}
-        items={items} 
+        availableResidences={availableResidences}
+        availableCharacterTypes={availableCharacterTypes}
+        availableBirthdaySeasons={availableBirthdaySeasons}
+        items={isNPCCategory ? npcs.map(n => ({ id: n.id, name: n.name })) : items} 
       />
 
-      {/* Items grid */}
-      {sortedItems.length === 0 ? (
+      {/* Items/NPCs grid */}
+      {filteredCount === 0 ? (
         <div className="card text-center py-8 sm:py-12">
           <p className="text-slate-400 text-sm sm:text-base">
-            {items.length === 0
-              ? "No items in this category yet. Run the seed script to add data."
+            {totalCount === 0
+              ? isNPCCategory 
+                ? "No NPCs in this category yet. Run the scraper to add data."
+                : "No items in this category yet. Run the seed script to add data."
               : "No items match your filters."}
           </p>
         </div>
-      ) : (
+      ) : isNPCCategory ? (
+        // NPC rendering
         <>
           <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
-            Showing {sortedItems.length} items ({sortedCompletedCount} completed)
+            Showing {filteredNPCs.length} NPCs ({filteredCompletedCount} max hearts)
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            {filteredNPCs.map((npc) => (
+              <NPCCard
+                key={npc.id}
+                npc={npc}
+                onIncrement={handleNPCIncrement}
+                onDecrement={handleNPCDecrement}
+                onUpdateProgress={handleNPCUpdateProgress}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        // Regular item rendering
+        <>
+          <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
+            Showing {sortedItems.length} items ({filteredCompletedCount} completed)
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {sortedItems.map((item) => (

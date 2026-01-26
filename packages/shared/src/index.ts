@@ -348,3 +348,120 @@ export const DEFAULT_FILTER_CONFIG: CategoryFilterConfig = {
   showGrowthTime: false,
   showPriceSort: true,
 };
+
+// ============================================
+// NPC Types
+// ============================================
+
+export type RelationshipStatus = "default" | "dating" | "married";
+export const RELATIONSHIP_STATUSES: RelationshipStatus[] = ["default", "dating", "married"];
+export const RELATIONSHIP_STATUS_LABELS: Record<RelationshipStatus, string> = {
+  default: "Friends",
+  dating: "Dating",
+  married: "Married",
+};
+
+export type CharacterType = "townie" | "merperson" | "giant" | "stranger" | "pet" | "other";
+export const CHARACTER_TYPES: CharacterType[] = ["townie", "merperson", "giant", "stranger", "pet", "other"];
+export const CHARACTER_TYPE_LABELS: Record<CharacterType, string> = {
+  townie: "Townie",
+  merperson: "Merperson",
+  giant: "Giant",
+  stranger: "Stranger",
+  pet: "Pet",
+  other: "Other",
+};
+
+export type NPCGender = "male" | "female" | "unknown";
+export const NPC_GENDERS: NPCGender[] = ["male", "female", "unknown"];
+
+// NPC metadata stored in the items.metadata JSON field
+export interface NPCMetadata {
+  birthday_season?: Season;
+  birthday_day?: number;
+  is_marriage_candidate: boolean;
+  residence?: string;
+  gender?: NPCGender;
+  character_type?: CharacterType;
+  wiki_url?: string;
+  gift_preferences?: {
+    loved?: string[];
+    liked?: string[];
+    disliked?: string[];
+    hated?: string[];
+  };
+}
+
+// NPC progress (relationship tracking)
+export interface NPCProgress {
+  id: number;
+  save_slot_id: number;
+  item_id: number;
+  hearts: number;
+  relationship_status: RelationshipStatus;
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// NPC item with progress
+export interface NPCWithProgress {
+  item: Item;
+  metadata: NPCMetadata;
+  progress: {
+    hearts: number;
+    relationship_status: RelationshipStatus;
+    notes: string | null;
+  } | null;
+  max_hearts: number; // 10 for regular, 14 for married
+}
+
+// API request for updating NPC progress
+export interface UpdateNPCProgressRequest {
+  hearts?: number;
+  relationship_status?: RelationshipStatus;
+  notes?: string | null;
+}
+
+// NPC filter configuration
+export interface NPCFilterConfig {
+  showBirthdaySeason: boolean;
+  showResidence: boolean;
+  showCharacterType: boolean;
+  showMarriageCandidates: boolean;
+  showGender: boolean;
+}
+
+export const NPC_FILTER_CONFIG: NPCFilterConfig = {
+  showBirthdaySeason: true,
+  showResidence: true,
+  showCharacterType: true,
+  showMarriageCandidates: true,
+  showGender: false, // Less useful, can enable later if needed
+};
+
+// Known residences in Coral Island (will be populated from scraped data)
+export const NPC_RESIDENCES = [
+  "Beach Shack",
+  "Blacksmith",
+  "Café",
+  "Carpenter",
+  "Community Center",
+  "Farm",
+  "Fire Station",
+  "Fishensips",
+  "General Store",
+  "Lab",
+  "Library",
+  "Lighthouse",
+  "Lookout",
+  "Museum",
+  "Ranch",
+  "Salon",
+  "Shrine",
+  "Tavern",
+  "Town Hall",
+  "Woodlands",
+] as const;
+
+export type NPCResidence = (typeof NPC_RESIDENCES)[number] | string;
