@@ -81,8 +81,9 @@ function ShortcutsHintButton() {
   // Don't show button when panel is open
   if (isShortcutsModalOpen) return null;
 
+// Hide on mobile - keyboard shortcuts don't make sense on touch devices
   return createPortal(
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div className="hidden md:flex fixed bottom-4 right-4 z-40 flex-col items-end gap-2">
       {/* Text hint */}
       <span className="text-sm text-slate-400 mr-1">
         Press <kbd className="kbd">?</kbd> for shortcuts
