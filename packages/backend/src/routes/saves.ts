@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { sql } from "../db";
 import { requireSession } from "../middleware/session";
-import type { SaveSlot, CreateSaveSlotRequest, CategoryStats } from "@coral-tracker/shared";
+import { errorResponse, successResponse } from "../utils/responses";
+import type { CreateSaveSlotRequest, CategoryStats } from "@coral-tracker/shared";
 
 const app = new Hono();
 
@@ -36,7 +37,7 @@ app.get("/", async (c) => {
     },
   }));
 
-  return c.json({ data: savesWithStats, success: true });
+  return successResponse(c, savesWithStats);
 });
 
 // POST /api/saves - Create new save slot for this session
@@ -45,10 +46,7 @@ app.post("/", async (c) => {
   const body = await c.req.json<CreateSaveSlotRequest>();
 
   if (!body.name || body.name.trim().length === 0) {
-    return c.json(
-      { error: "validation_error", message: "Name is required", success: false },
-      400
-    );
+    return errorResponse.validationError(c, "Name is required");
   }
 
   const result = await sql`
@@ -71,7 +69,7 @@ app.get("/:id", async (c) => {
   `;
 
   if (saveResult.length === 0) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   const save = saveResult[0];
@@ -100,17 +98,14 @@ app.get("/:id", async (c) => {
   const totalItems = categoryStats.reduce((sum, cat) => sum + cat.total, 0);
   const completedItems = categoryStats.reduce((sum, cat) => sum + cat.completed, 0);
 
-  return c.json({
-    data: {
-      ...save,
-      stats: {
-        total_items: totalItems,
-        completed_items: completedItems,
-        completion_percentage: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0,
-        by_category: categoryStats,
-      },
+  return successResponse(c, {
+    ...save,
+    stats: {
+      total_items: totalItems,
+      completed_items: completedItems,
+      completion_percentage: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0,
+      by_category: categoryStats,
     },
-    success: true,
   });
 });
 
@@ -124,10 +119,10 @@ app.delete("/:id", async (c) => {
   `;
 
   if (result.length === 0) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
-  return c.json({ data: { id }, success: true });
+  return successResponse(c, { id });
 });
 
 // PATCH /api/saves/:id - Update save slot name (only if owned by session)
@@ -137,10 +132,7 @@ app.patch("/:id", async (c) => {
   const body = await c.req.json<{ name: string }>();
 
   if (!body.name || body.name.trim().length === 0) {
-    return c.json(
-      { error: "validation_error", message: "Name is required", success: false },
-      400
-    );
+    return errorResponse.validationError(c, "Name is required");
   }
 
   const result = await sql`
@@ -151,10 +143,10 @@ app.patch("/:id", async (c) => {
   `;
 
   if (result.length === 0) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
-  return c.json({ data: result[0], success: true });
+  return successResponse(c, result[0]);
 });
 
 export default app;

@@ -1,22 +1,15 @@
 import { Hono } from "hono";
 import { sql } from "../db";
 import { requireSession } from "../middleware/session";
+import { withParsedMetadata } from "../utils/parseMetadata";
+import { verifySaveOwnership } from "../utils/ownership";
+import { errorResponse, successResponse } from "../utils/responses";
 import type { UpdateProgressRequest, BulkUpdateProgressRequest } from "@coral-tracker/shared";
 
 const app = new Hono();
 
 // Apply session middleware to all routes
 app.use("*", requireSession);
-
-/**
- * Helper to verify save slot belongs to session
- */
-async function verifySaveOwnership(saveId: number, sessionId: string): Promise<boolean> {
-  const result = await sql`
-    SELECT id FROM save_slots WHERE id = ${saveId} AND session_id = ${sessionId}
-  `;
-  return result.length > 0;
-}
 
 // GET /api/progress/:saveId - Get all progress for a save slot
 app.get("/:saveId", async (c) => {
@@ -26,7 +19,7 @@ app.get("/:saveId", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   let progress;
@@ -73,7 +66,7 @@ app.get("/:saveId", async (c) => {
     `;
   }
 
-  return c.json({ data: progress, success: true });
+  return successResponse(c, progress);
 });
 
 // GET /api/progress/:saveId/items - Get items with progress status for a save slot
@@ -85,7 +78,7 @@ app.get("/:saveId/items", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   let items;
@@ -125,7 +118,7 @@ app.get("/:saveId/items", async (c) => {
     `;
   }
 
-  return c.json({ data: items, success: true });
+  return successResponse(c, withParsedMetadata(items));
 });
 
 // PUT /api/progress/:saveId/:itemId - Update single item progress
@@ -137,13 +130,13 @@ app.put("/:saveId/:itemId", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Check if item exists
   const itemExists = await sql`SELECT id FROM items WHERE id = ${itemId}`;
   if (itemExists.length === 0) {
-    return c.json({ error: "not_found", message: "Item not found", success: false }, 404);
+    return errorResponse.notFound(c, "Item");
   }
 
   // Upsert progress
@@ -165,7 +158,7 @@ app.put("/:saveId/:itemId", async (c) => {
   // Update save slot's updated_at
   await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
 
-  return c.json({ data: result[0], success: true });
+  return successResponse(c, result[0]);
 });
 
 // POST /api/progress/:saveId/bulk - Bulk update progress
@@ -175,15 +168,12 @@ app.post("/:saveId/bulk", async (c) => {
   const body = await c.req.json<BulkUpdateProgressRequest>();
 
   if (!body.updates || body.updates.length === 0) {
-    return c.json(
-      { error: "validation_error", message: "Updates array is required", success: false },
-      400
-    );
+    return errorResponse.validationError(c, "Updates array is required");
   }
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Perform bulk upsert
@@ -209,7 +199,7 @@ app.post("/:saveId/bulk", async (c) => {
   // Update save slot's updated_at
   await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
 
-  return c.json({ data: results, success: true });
+  return successResponse(c, results);
 });
 
 export default app;

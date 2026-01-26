@@ -1,24 +1,8 @@
 import { createPortal } from "react-dom";
-import { X, ImageIcon, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unlock, Tag, Check, Sparkles, Clock, Cloud, MapPin, Gift, Package, Sun, Cog } from "lucide-react";
-import type { Item, Season, Rarity } from "@coral-tracker/shared";
-
-const rarityColors: Record<Rarity, string> = {
-  common: "bg-slate-600/50 text-slate-300 border border-slate-500/30",
-  uncommon: "bg-palm-600/30 text-palm-300 border border-palm-500/30",
-  rare: "bg-ocean-600/30 text-ocean-300 border border-ocean-500/30",
-  super_rare: "bg-indigo-600/30 text-indigo-300 border border-indigo-500/30",
-  epic: "bg-purple-600/30 text-purple-300 border border-purple-500/30",
-  legendary: "bg-gradient-to-r from-sand-500/40 to-coral-500/40 text-sand-200 border border-sand-400/50",
-};
-
-const seasonColors: Record<Season, string> = {
-  spring: "bg-pink-500/30 text-pink-300 border border-pink-400/30",
-  summer: "bg-sand-500/30 text-sand-300 border border-sand-400/30",
-  fall: "bg-orange-500/30 text-orange-300 border border-orange-400/30",
-  winter: "bg-cyan-500/30 text-cyan-300 border border-cyan-400/30",
-};
-
-const anyBadgeStyle = "bg-ocean-800/50 text-ocean-300 italic border border-ocean-600/30";
+import { X, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unlock, Tag, Check, Sparkles, Clock, Cloud, MapPin, Gift, Package, Sun, Cog } from "lucide-react";
+import type { Item, Season } from "@coral-tracker/shared";
+import { ItemImage } from "./ui";
+import { rarityColors, seasonColors, anyBadgeStyle, qualityTextColors } from "../lib/styles";
 
 interface ItemModalProps {
   item: Item & { completed?: boolean; notes?: string | null };
@@ -67,19 +51,8 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
       >
         {/* Header */}
         <div className="sticky top-0 bg-deepsea-800/95 backdrop-blur-sm border-b border-ocean-700/30 p-4 flex items-start gap-4">
-          {/* Item Image */}
-          {item.image_url ? (
-            <img
-              src={item.image_url}
-              alt={item.name}
-              className="w-16 h-16 object-contain rounded-lg bg-deepsea-900/50"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-16 h-16 bg-deepsea-900/50 rounded-lg flex items-center justify-center border border-ocean-800/30">
-              <ImageIcon size={28} className="text-ocean-500" />
-            </div>
-          )}
+{/* Item Image */}
+          <ItemImage src={item.image_url} alt={item.name} size="xl" className="rounded-lg" />
           
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold text-white mb-1">{item.name}</h2>
@@ -228,16 +201,10 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
                 <Coins size={16} className="text-sand-400" />
                 Sell Prices by Quality
               </h3>
-              <div className="grid grid-cols-5 gap-1 text-center text-sm">
+<div className="grid grid-cols-5 gap-1 text-center text-sm">
                 {["base", "bronze", "silver", "gold", "osmium"].map((quality) => (
                   <div key={quality} className="space-y-1">
-                    <div className={`text-xs font-medium capitalize ${
-                      quality === "base" ? "text-slate-400" :
-                      quality === "bronze" ? "text-orange-400" :
-                      quality === "silver" ? "text-slate-300" :
-                      quality === "gold" ? "text-yellow-400" :
-                      "text-purple-400"
-                    }`}>
+                    <div className={`text-xs font-medium capitalize ${qualityTextColors[quality]}`}>
                       {quality}
                     </div>
                     <div className="text-sand-300 font-medium">
@@ -259,13 +226,7 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
               <div className="grid grid-cols-5 gap-1 text-center text-sm">
                 {["base", "bronze", "silver", "gold", "osmium"].map((quality) => (
                   <div key={quality} className="space-y-1">
-                    <div className={`text-xs font-medium capitalize ${
-                      quality === "base" ? "text-slate-400" :
-                      quality === "bronze" ? "text-orange-400" :
-                      quality === "silver" ? "text-slate-300" :
-                      quality === "gold" ? "text-yellow-400" :
-                      "text-purple-400"
-                    }`}>
+                    <div className={`text-xs font-medium capitalize ${qualityTextColors[quality]}`}>
                       {quality}
                     </div>
                     <div className="text-palm-300 font-medium">
@@ -407,13 +368,7 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
                         <span className="text-ocean-200">
                           {reqItem.name}
                           {reqItem.quality && (
-                            <span className={`ml-1 text-xs ${
-                              reqItem.quality === "bronze" ? "text-orange-400" :
-                              reqItem.quality === "silver" ? "text-slate-300" :
-                              reqItem.quality === "gold" ? "text-yellow-400" :
-                              reqItem.quality === "osmium" ? "text-purple-400" :
-                              "text-slate-400"
-                            }`}>
+<span className={`ml-1 text-xs ${qualityTextColors[reqItem.quality] || "text-slate-400"}`}>
                               ({reqItem.quality})
                             </span>
                           )}

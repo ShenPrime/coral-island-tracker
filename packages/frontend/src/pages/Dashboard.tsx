@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { ProgressBar } from "@/components/ProgressBar";
+import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { getSaveSlot } from "@/lib/api";
 import {
   Fish,
@@ -12,7 +13,6 @@ import {
   UtensilsCrossed,
   Users,
   Rabbit,
-  AlertCircle,
   Leaf,
 } from "lucide-react";
 import type { CategoryStats } from "@coral-tracker/shared";
@@ -59,31 +59,12 @@ export function Dashboard() {
     loadStats();
   }, [currentSaveId]);
 
-  if (!currentSaveId) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="card text-center py-8 sm:py-12">
-          <AlertCircle size={40} className="mx-auto text-slate-400 mb-3 sm:mb-4 sm:w-12 sm:h-12" />
-          <h2 className="text-lg sm:text-xl font-semibold text-white mb-2">
-            No Save Slot Selected
-          </h2>
-          <p className="text-sm sm:text-base text-slate-400 mb-4 sm:mb-6 px-4">
-            Create or select a save slot to start tracking your progress
-          </p>
-          <Link to="/saves" className="btn btn-primary text-sm sm:text-base">
-            Go to Save Slots
-          </Link>
-        </div>
-      </div>
-    );
+if (!currentSaveId) {
+    return <NoSaveSlotWarning message="Create or select a save slot to start tracking your progress" />;
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocean-500" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (

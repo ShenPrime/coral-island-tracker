@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { sql } from "../db";
+import { errorResponse, successResponse } from "../utils/responses";
 import type { Category } from "@coral-tracker/shared";
 
 const app = new Hono();
@@ -12,7 +13,7 @@ app.get("/", async (c) => {
     ORDER BY display_order ASC
   `;
 
-  return c.json({ data: categories, success: true });
+  return successResponse(c, categories);
 });
 
 // GET /api/categories/:slug - Get single category with item count
@@ -30,10 +31,10 @@ app.get("/:slug", async (c) => {
   `;
 
   if (result.length === 0) {
-    return c.json({ error: "not_found", message: "Category not found", success: false }, 404);
+    return errorResponse.notFound(c, "Category");
   }
 
-  return c.json({ data: result[0], success: true });
+  return successResponse(c, result[0]);
 });
 
 export default app;

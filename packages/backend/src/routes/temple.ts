@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { sql } from "../db";
 import { requireSession } from "../middleware/session";
+import { ensureParsedMetadata } from "../utils/parseMetadata";
+import { verifySaveOwnership } from "../utils/ownership";
+import { errorResponse, successResponse } from "../utils/responses";
 import type {
   AltarSummary,
   AltarWithOfferings,
@@ -16,16 +19,6 @@ const templeRouter = new Hono();
 templeRouter.use("*", requireSession);
 
 /**
- * Helper to verify save slot belongs to session
- */
-async function verifySaveOwnership(saveId: number, sessionId: string): Promise<boolean> {
-  const result = await sql`
-    SELECT id FROM save_slots WHERE id = ${saveId} AND session_id = ${sessionId}
-  `;
-  return result.length > 0;
-}
-
-/**
  * GET /api/temple/altars
  * Get temple overview with all altars and their progress
  */
@@ -39,7 +32,7 @@ templeRouter.get("/altars", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(Number(saveId), session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   try {
@@ -119,10 +112,10 @@ templeRouter.get("/altars", async (c) => {
       ...totals,
     };
 
-    return c.json({ data: overview, success: true });
+    return successResponse(c, overview);
   } catch (error) {
     console.error("Error fetching temple overview:", error);
-    return c.json({ error: "server_error", message: "Failed to fetch temple data", success: false }, 500);
+    return errorResponse.serverError(c, "Failed to fetch temple data");
   }
 });
 
@@ -136,12 +129,12 @@ templeRouter.get("/altars/:altarSlug", async (c) => {
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
-    return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+    return errorResponse.badRequest(c, "saveId is required");
   }
 
   // Verify ownership
   if (!(await verifySaveOwnership(Number(saveId), session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   try {
@@ -184,7 +177,7 @@ templeRouter.get("/altars/:altarSlug", async (c) => {
     `;
 
     if (requirements.length === 0) {
-      return c.json({ error: "not_found", message: "Altar not found", success: false }, 404);
+      return errorResponse.notFound(c, "Altar");
     }
 
     // Group by offering
@@ -235,7 +228,7 @@ templeRouter.get("/altars/:altarSlug", async (c) => {
           locations: row.linked_item_locations || [],
           base_price: row.linked_item_price,
           description: row.linked_item_description,
-          metadata: row.linked_item_metadata || {},
+          metadata: ensureParsedMetadata(row.linked_item_metadata),
         } : null,
       };
 
@@ -297,10 +290,10 @@ templeRouter.get("/altars/:altarSlug", async (c) => {
       completed_offerings: offerings.filter((o) => o.is_complete).length,
     };
 
-    return c.json({ data: altar, success: true });
+    return successResponse(c, altar);
   } catch (error) {
     console.error("Error fetching altar:", error);
-    return c.json({ error: "server_error", message: "Failed to fetch altar data", success: false }, 500);
+    return errorResponse.serverError(c, "Failed to fetch altar data");
   }
 });
 
@@ -315,18 +308,18 @@ templeRouter.put("/progress/:requirementId", async (c) => {
   const body = await c.req.json();
 
   if (!saveId) {
-    return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+    return errorResponse.badRequest(c, "saveId is required");
   }
 
   // Verify ownership
   if (!(await verifySaveOwnership(Number(saveId), session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   const { offered } = body;
 
   if (typeof offered !== "boolean") {
-    return c.json({ error: "bad_request", message: "offered must be a boolean", success: false }, 400);
+    return errorResponse.badRequest(c, "offered must be a boolean");
   }
 
   try {
@@ -340,10 +333,10 @@ templeRouter.put("/progress/:requirementId", async (c) => {
         offered_at = ${offered ? new Date() : null}
     `;
 
-    return c.json({ data: { offered }, success: true });
+    return successResponse(c, { offered });
   } catch (error) {
     console.error("Error updating temple progress:", error);
-    return c.json({ error: "server_error", message: "Failed to update progress", success: false }, 500);
+    return errorResponse.serverError(c, "Failed to update progress");
   }
 });
 
@@ -357,12 +350,12 @@ templeRouter.get("/item/:itemId", async (c) => {
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
-    return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+    return errorResponse.badRequest(c, "saveId is required");
   }
 
   // Verify ownership
   if (!(await verifySaveOwnership(Number(saveId), session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   try {
@@ -392,10 +385,10 @@ templeRouter.get("/item/:itemId", async (c) => {
       })),
     };
 
-    return c.json({ data: status, success: true });
+    return successResponse(c, status);
   } catch (error) {
     console.error("Error checking item temple status:", error);
-    return c.json({ error: "server_error", message: "Failed to check temple status", success: false }, 500);
+    return errorResponse.serverError(c, "Failed to check temple status");
   }
 });
 
@@ -409,23 +402,23 @@ templeRouter.get("/items-status", async (c) => {
   const itemIds = c.req.query("itemIds");
 
   if (!saveId) {
-    return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+    return errorResponse.badRequest(c, "saveId is required");
   }
 
   // Verify ownership
   if (!(await verifySaveOwnership(Number(saveId), session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   if (!itemIds) {
-    return c.json({ error: "bad_request", message: "itemIds is required", success: false }, 400);
+    return errorResponse.badRequest(c, "itemIds is required");
   }
 
   try {
     const ids = itemIds.split(",").map(Number).filter(Boolean);
     
     if (ids.length === 0) {
-      return c.json({ data: {}, success: true });
+      return successResponse(c, {});
     }
 
     const requirements = await sql`
@@ -463,10 +456,10 @@ templeRouter.get("/items-status", async (c) => {
       });
     }
 
-    return c.json({ data: statusMap, success: true });
+    return successResponse(c, statusMap);
   } catch (error) {
     console.error("Error checking items temple status:", error);
-    return c.json({ error: "server_error", message: "Failed to check temple status", success: false }, 500);
+    return errorResponse.serverError(c, "Failed to check temple status");
   }
 });
 

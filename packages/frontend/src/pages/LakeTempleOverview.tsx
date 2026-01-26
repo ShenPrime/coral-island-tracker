@@ -1,65 +1,22 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useStore } from "@/store/useStore";
-import { getTempleOverview } from "@/lib/api";
 import { AltarCard } from "@/components/AltarCard";
 import { ProgressBar } from "@/components/ProgressBar";
+import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, Sun } from "lucide-react";
-import type { TempleOverview } from "@coral-tracker/shared";
+import { useTempleOverview } from "@/hooks/useQueries";
 
 export function LakeTempleOverview() {
   const { currentSaveId } = useStore();
-  const [overview, setOverview] = useState<TempleOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadOverview() {
-      if (!currentSaveId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await getTempleOverview(currentSaveId);
-        setOverview(data);
-        setError(null);
-      } catch (err) {
-        console.error("Failed to load temple overview:", err);
-        setError("Failed to load temple data. Make sure you've run the temple migration.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadOverview();
-  }, [currentSaveId]);
+  // Query hook
+  const { data: overview, isLoading, error } = useTempleOverview(currentSaveId);
 
   if (!currentSaveId) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="card text-center py-12">
-          <AlertCircle size={48} className="mx-auto text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
-            No Save Slot Selected
-          </h2>
-          <p className="text-slate-400 mb-6">
-            Please select a save slot first to track your temple offerings
-          </p>
-          <Link to="/saves" className="btn btn-primary">
-            Go to Save Slots
-          </Link>
-        </div>
-      </div>
-    );
+    return <NoSaveSlotWarning message="Please select a save slot first to track your temple offerings" />;
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocean-500" />
-      </div>
-    );
+  if (isLoading) {
+    return <PageLoader />;
   }
 
   if (error) {
@@ -68,7 +25,9 @@ export function LakeTempleOverview() {
         <div className="card text-center py-12">
           <AlertCircle size={48} className="mx-auto text-coral-400 mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Error Loading Temple</h2>
-          <p className="text-slate-400 mb-4">{error}</p>
+          <p className="text-slate-400 mb-4">
+            Failed to load temple data. Make sure you've run the temple migration.
+          </p>
           <p className="text-sm text-slate-500">
             Try running: <code className="bg-deepsea-900 px-2 py-1 rounded">bun run db:migrate:temple-redesign</code>
           </p>
@@ -149,10 +108,10 @@ export function LakeTempleOverview() {
       <div className="mt-8 p-4 bg-deepsea-900/50 rounded-lg border border-ocean-800/30">
         <h3 className="font-medium text-white mb-2">How Temple Offerings Work</h3>
         <ul className="text-sm text-slate-400 space-y-1">
-          <li>• Each altar has 6 offerings to complete</li>
-          <li>• Each offering requires specific items to be offered</li>
-          <li>• Completing offerings unlocks rewards like machines and blueprints</li>
-          <li>• Items marked as "offered" here will also show as offered in their category pages</li>
+          <li>- Each altar has 6 offerings to complete</li>
+          <li>- Each offering requires specific items to be offered</li>
+          <li>- Completing offerings unlocks rewards like machines and blueprints</li>
+          <li>- Items marked as "offered" here will also show as offered in their category pages</li>
         </ul>
       </div>
     </div>

@@ -1,35 +1,14 @@
 import { useState } from "react";
-import { Check, ImageIcon, Info, MapPin, Clock, Sparkles } from "lucide-react";
+import { Check, Info, MapPin, Clock, Sparkles } from "lucide-react";
 import type { TempleItemWithProgress, Item, Season, Rarity } from "@coral-tracker/shared";
 import { ItemModal } from "./ItemModal";
+import { ItemImage } from "./ui";
+import { rarityColors, seasonColors, qualityColors } from "../lib/styles";
 
 interface TempleItemCardProps {
   item: TempleItemWithProgress;
   onToggleOffered: (requirementId: number, offered: boolean) => void;
 }
-
-const qualityColors: Record<string, string> = {
-  bronze: "text-orange-400 bg-orange-500/20 border-orange-500/30",
-  silver: "text-slate-300 bg-slate-500/20 border-slate-500/30",
-  gold: "text-yellow-400 bg-yellow-500/20 border-yellow-500/30",
-  osmium: "text-purple-400 bg-purple-500/20 border-purple-500/30",
-};
-
-const rarityColors: Record<Rarity, string> = {
-  common: "bg-slate-600/50 text-slate-300 border border-slate-500/30",
-  uncommon: "bg-palm-600/30 text-palm-300 border border-palm-500/30",
-  rare: "bg-ocean-600/30 text-ocean-300 border border-ocean-500/30",
-  super_rare: "bg-indigo-600/30 text-indigo-300 border border-indigo-500/30",
-  epic: "bg-purple-600/30 text-purple-300 border border-purple-500/30",
-  legendary: "bg-gradient-to-r from-sand-500/40 to-coral-500/40 text-sand-200 border border-sand-400/50",
-};
-
-const seasonColors: Record<Season, string> = {
-  spring: "bg-pink-500/30 text-pink-300 border border-pink-400/30",
-  summer: "bg-sand-500/30 text-sand-300 border border-sand-400/30",
-  fall: "bg-orange-500/30 text-orange-300 border border-orange-400/30",
-  winter: "bg-cyan-500/30 text-cyan-300 border border-cyan-400/30",
-};
 
 export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
   const [justOffered, setJustOffered] = useState(false);
@@ -107,20 +86,8 @@ export function TempleItemCard({ item, onToggleOffered }: TempleItemCardProps) {
             />
           </div>
 
-          {/* Item Image */}
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={item.item_name}
-              className="w-10 h-10 object-contain flex-shrink-0 rounded bg-deepsea-900/50"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-10 h-10 bg-deepsea-900/50 rounded flex items-center justify-center flex-shrink-0 border border-ocean-800/30">
-              <ImageIcon size={18} className="text-ocean-500" />
-            </div>
-          )}
+{/* Item Image */}
+          <ItemImage src={imageUrl} alt={item.item_name} size="md" />
 
           {/* Content */}
           <div className="flex-1 min-w-0">

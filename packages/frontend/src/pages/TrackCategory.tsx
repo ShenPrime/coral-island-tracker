@@ -1,12 +1,11 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useRef } from "react";
+import { useParams } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
 import { NPCCard } from "@/components/NPCCard";
 import { ProgressBar } from "@/components/ProgressBar";
-import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress, getNPCs, incrementNPCHearts, decrementNPCHearts, updateNPCProgress } from "@/lib/api";
-import { AlertCircle } from "lucide-react";
+import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { 
   FISHING_LOCATIONS, 
   FORAGING_LOCATIONS, 
@@ -17,26 +16,26 @@ import {
   DEFAULT_FILTER_CONFIG,
   getGrowthTimeBucket,
 } from "@coral-tracker/shared";
-import type { Item, Category, ItemTempleStatus, Rarity, NPCMetadata, RelationshipStatus, Season, CharacterType } from "@coral-tracker/shared";
+import type { Rarity, Season, CharacterType } from "@coral-tracker/shared";
 
-type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
+// Query hooks
+import { 
+  useProgressItems, 
+  useNPCs, 
+  useCategory, 
+  useTempleStatus,
+} from "@/hooks/useQueries";
 
-// NPC data type from API
-interface NPCData {
-  id: number;
-  name: string;
-  slug: string;
-  image_url: string | null;
-  description: string | null;
-  seasons: Season[];
-  locations: string[];
-  metadata: NPCMetadata;
-  hearts: number;
-  relationship_status: RelationshipStatus;
-  notes: string | null;
-  max_hearts: number;
-  is_max_hearts: boolean;
-}
+// Mutation hooks
+import {
+  useUpdateProgress,
+  useUpdateTempleProgress,
+  useUpdateNPCProgress,
+  useIncrementNPCHearts,
+  useDecrementNPCHearts,
+} from "@/hooks/useMutations";
+
+import type { RelationshipStatus } from "@coral-tracker/shared";
 
 // Helper to parse metadata (handles string or object)
 function parseMetadata(metadata: unknown): Record<string, unknown> {
@@ -90,54 +89,47 @@ export function TrackCategory() {
   // Track previous slug to detect category changes
   const prevSlugRef = useRef<string | undefined>(undefined);
 
-  const [items, setItems] = useState<ItemWithProgress[]>([]);
-  const [npcs, setNPCs] = useState<NPCData[]>([]);
-  const [category, setCategory] = useState<(Category & { item_count: number }) | null>(null);
-  const [templeStatus, setTempleStatus] = useState<Record<number, ItemTempleStatus>>({});
-  const [loading, setLoading] = useState(true);
+  // ============================================================
+  // React Query hooks for data fetching
+  // ============================================================
 
-  const loadItems = useCallback(async () => {
-    if (!currentSaveId || !slug) return;
+  const { data: category } = useCategory(slug);
 
-    setLoading(true);
-    try {
-      // Load NPCs differently
-      if (slug === "npcs") {
-        const [npcsData, categoryData] = await Promise.all([
-          getNPCs(currentSaveId),
-          getCategory(slug),
-        ]);
-        setNPCs(npcsData);
-        setItems([]);
-        setCategory(categoryData);
-      } else {
-        const [itemsData, categoryData] = await Promise.all([
-          getProgressItems(currentSaveId, slug),
-          getCategory(slug),
-        ]);
-        setItems(itemsData);
-        setNPCs([]);
-        setCategory(categoryData);
+  const { 
+    data: items = [], 
+    isLoading: isLoadingItems,
+  } = useProgressItems(currentSaveId, isNPCCategory ? undefined : slug);
 
-        // Load temple status for all items
-        const itemIds = itemsData.map((item) => item.id);
-        if (itemIds.length > 0) {
-          const status = await getItemsTempleStatus(currentSaveId, itemIds);
-          setTempleStatus(status);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load items:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentSaveId, slug]);
+  const { 
+    data: npcs = [], 
+    isLoading: isLoadingNPCs,
+  } = useNPCs(isNPCCategory ? currentSaveId : null);
 
-  useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+  // Get item IDs for temple status query
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
 
-  // Clear category-specific filters when switching categories
+  const { data: templeStatus = {} } = useTempleStatus(
+    currentSaveId,
+    slug,
+    itemIds
+  );
+
+  const loading = isNPCCategory ? isLoadingNPCs : isLoadingItems;
+
+  // ============================================================
+  // Mutation hooks
+  // ============================================================
+
+  const updateProgressMutation = useUpdateProgress();
+  const updateTempleMutation = useUpdateTempleProgress();
+  const updateNPCProgressMutation = useUpdateNPCProgress();
+  const incrementHeartsMutation = useIncrementNPCHearts();
+  const decrementHeartsMutation = useDecrementNPCHearts();
+
+  // ============================================================
+  // Clear filters on category change
+  // ============================================================
+
   useEffect(() => {
     // Skip on initial mount
     if (prevSlugRef.current === undefined) {
@@ -180,128 +172,65 @@ export function TrackCategory() {
     }
   }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons, clearCharacterTypes, clearResidences, setMarriageCandidatesOnly, setBirthdaySeason]);
 
-  const handleToggle = async (itemId: number, completed: boolean) => {
-    if (!currentSaveId) return;
+  // ============================================================
+  // Event handlers (using mutations)
+  // ============================================================
 
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, completed, completed_at: completed ? new Date().toISOString() : null }
-          : item
-      )
-    );
+  const handleToggle = (itemId: number, completed: boolean) => {
+    if (!currentSaveId || !slug) return;
 
-    try {
-      await updateProgress(currentSaveId, itemId, { completed });
-    } catch (error) {
-      console.error("Failed to update progress:", error);
-      // Revert on error
-      loadItems();
-    }
-  };
-
-  const handleToggleOffered = async (itemId: number, requirementId: number, offered: boolean) => {
-    if (!currentSaveId) return;
-
-    // Optimistic update
-    setTempleStatus((prev) => {
-      const itemStatus = prev[itemId];
-      if (!itemStatus) return prev;
-      
-      return {
-        ...prev,
-        [itemId]: {
-          ...itemStatus,
-          requirements: itemStatus.requirements.map((req) =>
-            req.requirement_id === requirementId ? { ...req, offered } : req
-          ),
-        },
-      };
+    updateProgressMutation.mutate({
+      saveId: currentSaveId,
+      itemId,
+      category: slug,
+      data: { completed },
     });
-
-    try {
-      await updateTempleProgress(currentSaveId, requirementId, offered);
-    } catch (error) {
-      console.error("Failed to update temple progress:", error);
-      // Reload temple status on error
-      const itemIds = items.map((item) => item.id);
-      if (itemIds.length > 0) {
-        const status = await getItemsTempleStatus(currentSaveId, itemIds);
-        setTempleStatus(status);
-      }
-    }
   };
 
-  // NPC handlers
-  const handleNPCIncrement = async (npcId: number) => {
+  const handleToggleOffered = (itemId: number, requirementId: number, offered: boolean) => {
+    if (!currentSaveId || !slug) return;
+
+    updateTempleMutation.mutate({
+      saveId: currentSaveId,
+      requirementId,
+      itemId,
+      category: slug,
+      offered,
+    });
+  };
+
+  const handleNPCIncrement = (npcId: number) => {
     if (!currentSaveId) return;
 
-    // Optimistic update
-    setNPCs((prev) =>
-      prev.map((npc) =>
-        npc.id === npcId && npc.hearts < npc.max_hearts
-          ? { ...npc, hearts: npc.hearts + 1, is_max_hearts: npc.hearts + 1 >= npc.max_hearts }
-          : npc
-      )
-    );
-
-    try {
-      await incrementNPCHearts(currentSaveId, npcId);
-    } catch (error) {
-      console.error("Failed to increment NPC hearts:", error);
-      loadItems();
-    }
+    incrementHeartsMutation.mutate({
+      saveId: currentSaveId,
+      npcId,
+    });
   };
 
-  const handleNPCDecrement = async (npcId: number) => {
+  const handleNPCDecrement = (npcId: number) => {
     if (!currentSaveId) return;
 
-    // Optimistic update
-    setNPCs((prev) =>
-      prev.map((npc) =>
-        npc.id === npcId && npc.hearts > 0
-          ? { ...npc, hearts: npc.hearts - 1, is_max_hearts: false }
-          : npc
-      )
-    );
-
-    try {
-      await decrementNPCHearts(currentSaveId, npcId);
-    } catch (error) {
-      console.error("Failed to decrement NPC hearts:", error);
-      loadItems();
-    }
+    decrementHeartsMutation.mutate({
+      saveId: currentSaveId,
+      npcId,
+    });
   };
 
-  const handleNPCUpdateProgress = async (npcId: number, hearts: number, status: RelationshipStatus) => {
+  const handleNPCUpdateProgress = (npcId: number, hearts: number, status: RelationshipStatus) => {
     if (!currentSaveId) return;
 
-    // Optimistic update
-    setNPCs((prev) =>
-      prev.map((npc) => {
-        if (npc.id !== npcId) return npc;
-        
-        const isMarriageCandidate = npc.metadata?.is_marriage_candidate || false;
-        const newMaxHearts = isMarriageCandidate && status === "married" ? 14 : 10;
-        
-        return {
-          ...npc,
-          hearts,
-          relationship_status: status,
-          max_hearts: newMaxHearts,
-          is_max_hearts: hearts >= newMaxHearts,
-        };
-      })
-    );
-
-    try {
-      await updateNPCProgress(currentSaveId, npcId, { hearts, relationship_status: status });
-    } catch (error) {
-      console.error("Failed to update NPC progress:", error);
-      loadItems();
-    }
+    updateNPCProgressMutation.mutate({
+      saveId: currentSaveId,
+      npcId,
+      hearts,
+      relationship_status: status,
+    });
   };
+
+  // ============================================================
+  // Derived data for filters
+  // ============================================================
 
   // Get available locations based on category
   const availableLocations = 
@@ -366,7 +295,10 @@ export function TrackCategory() {
     return SEASONS.filter((s) => seasonSet.has(s));
   }, [npcs, isNPCCategory]);
 
-  // Filter items based on all filters
+  // ============================================================
+  // Filter items
+  // ============================================================
+
   const filteredItems = items.filter((item) => {
     // Search filter
     if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -443,7 +375,10 @@ export function TrackCategory() {
     return true;
   });
 
+  // ============================================================
   // Filter NPCs
+  // ============================================================
+
   const filteredNPCs = npcs.filter((npc) => {
     // Search filter
     if (searchQuery && !npc.name.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -490,7 +425,10 @@ export function TrackCategory() {
     return true;
   });
 
-  // Sort items based on priceSort
+  // ============================================================
+  // Sort items
+  // ============================================================
+
   const sortedItems = useMemo(() => {
     if (priceSort === "none") return filteredItems;
     
@@ -503,7 +441,10 @@ export function TrackCategory() {
     });
   }, [filteredItems, priceSort]);
 
-  // Calculate completion counts
+  // ============================================================
+  // Calculate counts
+  // ============================================================
+
   const completedCount = isNPCCategory 
     ? npcs.filter((n) => n.is_max_hearts).length
     : items.filter((i) => i.completed).length;
@@ -513,31 +454,16 @@ export function TrackCategory() {
     : sortedItems.filter((i) => i.completed).length;
   const filteredCount = isNPCCategory ? filteredNPCs.length : sortedItems.length;
 
+  // ============================================================
+  // Render
+  // ============================================================
+
   if (!currentSaveId) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="card text-center py-12">
-          <AlertCircle size={48} className="mx-auto text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
-            No Save Slot Selected
-          </h2>
-          <p className="text-slate-400 mb-6">
-            Please select a save slot first to track your progress
-          </p>
-          <Link to="/saves" className="btn btn-primary">
-            Go to Save Slots
-          </Link>
-        </div>
-      </div>
-    );
+    return <NoSaveSlotWarning />;
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocean-500" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (

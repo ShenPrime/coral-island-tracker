@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { sql } from "../db";
-import type { Item, ItemsQueryParams, Season, TimeOfDay, Weather, Rarity } from "@coral-tracker/shared";
+import { withParsedMetadata, ensureParsedMetadata } from "../utils/parseMetadata";
+import { errorResponse, successResponse } from "../utils/responses";
+import type { ItemsQueryParams } from "@coral-tracker/shared";
 
 const app = new Hono();
 
@@ -69,12 +71,10 @@ app.get("/", async (c) => {
     ${search ? sql`AND i.name ILIKE ${"%" + search + "%"}` : sql``}
   `;
 
-  return c.json({
-    data: items,
+  return successResponse(c, withParsedMetadata(items), {
     total: countResult[0]?.total ?? 0,
     limit: Number(limit),
     offset: Number(offset),
-    success: true,
   });
 });
 
@@ -90,10 +90,11 @@ app.get("/:id", async (c) => {
   `;
 
   if (result.length === 0) {
-    return c.json({ error: "not_found", message: "Item not found", success: false }, 404);
+    return errorResponse.notFound(c, "Item");
   }
 
-  return c.json({ data: result[0], success: true });
+  const item = result[0];
+  return successResponse(c, { ...item, metadata: ensureParsedMetadata(item.metadata) });
 });
 
 export default app;

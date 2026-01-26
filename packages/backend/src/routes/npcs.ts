@@ -1,22 +1,15 @@
 import { Hono } from "hono";
 import { sql } from "../db";
 import { requireSession } from "../middleware/session";
+import { ensureParsedMetadata } from "../utils/parseMetadata";
+import { verifySaveOwnership } from "../utils/ownership";
+import { errorResponse, successResponse } from "../utils/responses";
 import type { UpdateNPCProgressRequest, RelationshipStatus } from "@coral-tracker/shared";
 
 const app = new Hono();
 
 // Apply session middleware to all routes
 app.use("*", requireSession);
-
-/**
- * Helper to verify save slot belongs to session
- */
-async function verifySaveOwnership(saveId: number, sessionId: string): Promise<boolean> {
-  const result = await sql`
-    SELECT id FROM save_slots WHERE id = ${saveId} AND session_id = ${sessionId}
-  `;
-  return result.length > 0;
-}
 
 /**
  * Calculate max hearts for an NPC based on relationship status and marriage candidate flag
@@ -35,7 +28,7 @@ app.get("/:saveId", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Get all NPCs (from items table where category is 'npcs') with progress
@@ -64,8 +57,8 @@ app.get("/:saveId", async (c) => {
 
   // Add computed max_hearts to each NPC
   const npcsWithMaxHearts = npcs.map((npc) => {
-    const metadata = typeof npc.metadata === "string" ? JSON.parse(npc.metadata) : npc.metadata;
-    const isMarriageCandidate = metadata?.is_marriage_candidate || false;
+    const metadata = ensureParsedMetadata(npc.metadata);
+    const isMarriageCandidate = Boolean(metadata?.is_marriage_candidate);
     const maxHearts = getMaxHearts(isMarriageCandidate, npc.relationship_status as RelationshipStatus);
     
     return {
@@ -76,7 +69,7 @@ app.get("/:saveId", async (c) => {
     };
   });
 
-  return c.json({ data: npcsWithMaxHearts, success: true });
+  return successResponse(c, npcsWithMaxHearts);
 });
 
 // GET /api/npcs/:saveId/stats - Get NPC completion stats for a save slot
@@ -86,7 +79,7 @@ app.get("/:saveId/stats", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Get NPC stats
@@ -133,12 +126,9 @@ app.get("/:saveId/stats", async (c) => {
     FROM marriage_data
   `;
 
-  return c.json({
-    data: {
-      ...stats[0],
-      ...marriageStats[0],
-    },
-    success: true,
+  return successResponse(c, {
+    ...stats[0],
+    ...marriageStats[0],
   });
 });
 
@@ -151,7 +141,7 @@ app.put("/:saveId/:itemId", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Check if item exists and is an NPC
@@ -163,18 +153,16 @@ app.put("/:saveId/:itemId", async (c) => {
   `;
   
   if (item.length === 0) {
-    return c.json({ error: "not_found", message: "Item not found", success: false }, 404);
+    return errorResponse.notFound(c, "Item");
   }
   
   if (item[0]!.category_slug !== "npcs") {
-    return c.json({ error: "validation_error", message: "Item is not an NPC", success: false }, 400);
+    return errorResponse.validationError(c, "Item is not an NPC");
   }
 
   // Get metadata to validate hearts
-  const metadata = typeof item[0]!.metadata === "string" 
-    ? JSON.parse(item[0]!.metadata) 
-    : item[0]!.metadata;
-  const isMarriageCandidate = metadata?.is_marriage_candidate || false;
+  const metadata = ensureParsedMetadata(item[0]!.metadata);
+  const isMarriageCandidate = Boolean(metadata?.is_marriage_candidate);
 
   // Get current progress to determine relationship status
   const currentProgress = await sql`
@@ -199,22 +187,14 @@ app.put("/:saveId/:itemId", async (c) => {
   if (body.relationship_status) {
     // Can only set dating/married status for marriage candidates
     if ((body.relationship_status === "dating" || body.relationship_status === "married") && !isMarriageCandidate) {
-      return c.json({
-        error: "validation_error",
-        message: "Can only date or marry marriage candidates",
-        success: false,
-      }, 400);
+      return errorResponse.validationError(c, "Can only date or marry marriage candidates");
     }
     
     // Dating requires 8+ hearts
     if (body.relationship_status === "dating") {
       const currentHearts = hearts ?? currentProgress[0]?.hearts ?? 0;
       if (currentHearts < 8) {
-        return c.json({
-          error: "validation_error",
-          message: "Need at least 8 hearts to start dating",
-          success: false,
-        }, 400);
+        return errorResponse.validationError(c, "Need at least 8 hearts to start dating");
       }
     }
     
@@ -222,11 +202,7 @@ app.put("/:saveId/:itemId", async (c) => {
     if (body.relationship_status === "married") {
       const currentHearts = hearts ?? currentProgress[0]?.hearts ?? 0;
       if (currentHearts < 10) {
-        return c.json({
-          error: "validation_error",
-          message: "Need at least 10 hearts to marry",
-          success: false,
-        }, 400);
+        return errorResponse.validationError(c, "Need at least 10 hearts to marry");
       }
     }
   }
@@ -259,13 +235,10 @@ app.put("/:saveId/:itemId", async (c) => {
   // Return updated progress with computed max_hearts
   const updatedMaxHearts = getMaxHearts(isMarriageCandidate, result[0]!.relationship_status as RelationshipStatus);
   
-  return c.json({
-    data: {
-      ...result[0],
-      max_hearts: updatedMaxHearts,
-      is_max_hearts: result[0]!.hearts >= updatedMaxHearts,
-    },
-    success: true,
+  return successResponse(c, {
+    ...result[0],
+    max_hearts: updatedMaxHearts,
+    is_max_hearts: result[0]!.hearts >= updatedMaxHearts,
   });
 });
 
@@ -277,7 +250,7 @@ app.post("/:saveId/:itemId/increment", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Get item metadata
@@ -289,13 +262,11 @@ app.post("/:saveId/:itemId/increment", async (c) => {
   `;
   
   if (item.length === 0) {
-    return c.json({ error: "not_found", message: "NPC not found", success: false }, 404);
+    return errorResponse.notFound(c, "NPC");
   }
 
-  const metadata = typeof item[0]!.metadata === "string" 
-    ? JSON.parse(item[0]!.metadata) 
-    : item[0]!.metadata;
-  const isMarriageCandidate = metadata?.is_marriage_candidate || false;
+  const metadata = ensureParsedMetadata(item[0]!.metadata);
+  const isMarriageCandidate = Boolean(metadata?.is_marriage_candidate);
 
   // Get current progress
   const current = await sql`
@@ -322,13 +293,10 @@ app.post("/:saveId/:itemId/increment", async (c) => {
 
   await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
 
-  return c.json({
-    data: {
-      ...result[0],
-      max_hearts: maxHearts,
-      is_max_hearts: newHearts >= maxHearts,
-    },
-    success: true,
+  return successResponse(c, {
+    ...result[0],
+    max_hearts: maxHearts,
+    is_max_hearts: newHearts >= maxHearts,
   });
 });
 
@@ -340,7 +308,7 @@ app.post("/:saveId/:itemId/decrement", async (c) => {
 
   // Verify ownership
   if (!(await verifySaveOwnership(saveId, session.id))) {
-    return c.json({ error: "not_found", message: "Save slot not found", success: false }, 404);
+    return errorResponse.notFound(c, "Save slot");
   }
 
   // Get item metadata
@@ -352,13 +320,11 @@ app.post("/:saveId/:itemId/decrement", async (c) => {
   `;
   
   if (item.length === 0) {
-    return c.json({ error: "not_found", message: "NPC not found", success: false }, 404);
+    return errorResponse.notFound(c, "NPC");
   }
 
-  const metadata = typeof item[0]!.metadata === "string" 
-    ? JSON.parse(item[0]!.metadata) 
-    : item[0]!.metadata;
-  const isMarriageCandidate = metadata?.is_marriage_candidate || false;
+  const metadata = ensureParsedMetadata(item[0]!.metadata);
+  const isMarriageCandidate = Boolean(metadata?.is_marriage_candidate);
 
   // Get current progress
   const current = await sql`
@@ -385,13 +351,10 @@ app.post("/:saveId/:itemId/decrement", async (c) => {
 
   await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
 
-  return c.json({
-    data: {
-      ...result[0],
-      max_hearts: maxHearts,
-      is_max_hearts: newHearts >= maxHearts,
-    },
-    success: true,
+  return successResponse(c, {
+    ...result[0],
+    max_hearts: maxHearts,
+    is_max_hearts: newHearts >= maxHearts,
   });
 });
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, Gift, CheckCircle2, ImageIcon } from "lucide-react";
+import { ChevronDown, Gift, CheckCircle2 } from "lucide-react";
 import { TempleItemCard } from "./TempleItemCard";
 import { ProgressBar } from "./ProgressBar";
+import { ItemImage } from "./ui";
 import type { OfferingWithItems } from "@coral-tracker/shared";
 
 interface OfferingSectionProps {
@@ -20,19 +21,8 @@ export function OfferingSection({ offering, onToggleOffered, defaultExpanded = t
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full p-4 flex items-center gap-4 hover:bg-ocean-800/20 transition-colors text-left"
       >
-        {/* Offering Image */}
-        {offering.image_url ? (
-          <img
-            src={offering.image_url}
-            alt={offering.name}
-            className="w-14 h-14 object-contain rounded-lg bg-deepsea-900/50 flex-shrink-0"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="w-14 h-14 bg-deepsea-900/50 rounded-lg flex items-center justify-center flex-shrink-0 border border-ocean-800/30">
-            <ImageIcon size={24} className="text-ocean-500" />
-          </div>
-        )}
+{/* Offering Image */}
+        <ItemImage src={offering.image_url} alt={offering.name} size="lg" className="rounded-lg" />
 
         {/* Title and Progress */}
         <div className="flex-1 min-w-0">

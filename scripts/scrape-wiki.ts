@@ -1449,7 +1449,7 @@ async function insertItems(categorySlug: string, items: ScrapedItem[]): Promise<
           ${item.base_price || null},
           ${item.image_url || null},
           ${item.description || null},
-          ${JSON.stringify(item.metadata || {})}
+          ${item.metadata || {}}
         )
         ON CONFLICT (category_id, slug) DO UPDATE SET
           name = EXCLUDED.name,

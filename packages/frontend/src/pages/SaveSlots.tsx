@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { ProgressBar } from "@/components/ProgressBar";
-import { getSaveSlots, createSaveSlot, deleteSaveSlot } from "@/lib/api";
+import { PageLoader } from "@/components/ui";
 import { Plus, Trash2, Check, Save } from "lucide-react";
 import type { SaveSlot } from "@coral-tracker/shared";
+import { useSaveSlots } from "@/hooks/useQueries";
+import { useCreateSaveSlot, useDeleteSaveSlot } from "@/hooks/useMutations";
 
 interface SaveSlotWithStats extends SaveSlot {
   stats: {
@@ -15,44 +17,31 @@ interface SaveSlotWithStats extends SaveSlot {
 
 export function SaveSlots() {
   const { currentSaveId, setCurrentSaveId } = useStore();
-  const [saves, setSaves] = useState<SaveSlotWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
   const [newSaveName, setNewSaveName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
 
-  const loadSaves = async () => {
-    try {
-      const data = await getSaveSlots();
-      setSaves(data as SaveSlotWithStats[]);
-    } catch (error) {
-      console.error("Failed to load saves:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Query hooks
+  const { data: saves = [], isLoading } = useSaveSlots();
 
-  useEffect(() => {
-    loadSaves();
-  }, []);
+  // Mutation hooks
+  const createSaveMutation = useCreateSaveSlot();
+  const deleteSaveMutation = useDeleteSaveSlot();
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSaveName.trim()) return;
 
-    setIsCreating(true);
-    try {
-      const newSave = await createSaveSlot({ name: newSaveName.trim() });
-      await loadSaves();
-      setNewSaveName("");
-      // Auto-select the new save if no save is currently selected
-      if (!currentSaveId) {
-        setCurrentSaveId(newSave.id);
+    createSaveMutation.mutate(
+      { name: newSaveName.trim() },
+      {
+        onSuccess: (newSave) => {
+          setNewSaveName("");
+          // Auto-select the new save if no save is currently selected
+          if (!currentSaveId) {
+            setCurrentSaveId(newSave.id);
+          }
+        },
       }
-    } catch (error) {
-      console.error("Failed to create save:", error);
-    } finally {
-      setIsCreating(false);
-    }
+    );
   };
 
   const handleDelete = async (id: number) => {
@@ -60,28 +49,25 @@ export function SaveSlots() {
       return;
     }
 
-    try {
-      await deleteSaveSlot(id);
-      if (currentSaveId === id) {
-        setCurrentSaveId(null);
-      }
-      await loadSaves();
-    } catch (error) {
-      console.error("Failed to delete save:", error);
-    }
+    deleteSaveMutation.mutate(id, {
+      onSuccess: () => {
+        if (currentSaveId === id) {
+          setCurrentSaveId(null);
+        }
+      },
+    });
   };
 
   const handleSelect = (id: number) => {
     setCurrentSaveId(id);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocean-500" />
-      </div>
-    );
+  if (isLoading) {
+    return <PageLoader />;
   }
+
+  // Cast saves to include stats (API returns this)
+  const savesWithStats = saves as SaveSlotWithStats[];
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -102,18 +88,22 @@ export function SaveSlots() {
             value={newSaveName}
             onChange={(e) => setNewSaveName(e.target.value)}
             className="input flex-1 text-sm sm:text-base"
-            disabled={isCreating}
+            disabled={createSaveMutation.isPending}
           />
-          <button type="submit" className="btn btn-primary flex items-center justify-center gap-2 text-sm sm:text-base" disabled={isCreating}>
+          <button 
+            type="submit" 
+            className="btn btn-primary flex items-center justify-center gap-2 text-sm sm:text-base" 
+            disabled={createSaveMutation.isPending}
+          >
             <Plus size={18} />
-            Create
+            {createSaveMutation.isPending ? "Creating..." : "Create"}
           </button>
         </form>
       </div>
 
       {/* Save slots list */}
       <div className="space-y-3 sm:space-y-4">
-        {saves.length === 0 ? (
+        {savesWithStats.length === 0 ? (
           <div className="card text-center py-8 sm:py-12">
             <Save size={40} className="mx-auto text-slate-400 mb-3 sm:mb-4" />
             <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
@@ -124,7 +114,7 @@ export function SaveSlots() {
             </p>
           </div>
         ) : (
-          saves.map((save) => (
+          savesWithStats.map((save) => (
             <div
               key={save.id}
               className={`card cursor-pointer transition-all p-4 sm:p-6 ${
@@ -156,16 +146,17 @@ export function SaveSlots() {
                   }}
                   className="p-2 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
                   title="Delete save slot"
+                  disabled={deleteSaveMutation.isPending}
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
 
               <ProgressBar
-                value={save.stats.completed_items}
-                max={save.stats.total_items}
+                value={save.stats?.completed_items || 0}
+                max={save.stats?.total_items || 0}
                 label="Progress"
-                color={save.stats.completion_percentage === 100 ? "green" : "ocean"}
+                color={save.stats?.completion_percentage === 100 ? "green" : "ocean"}
               />
             </div>
           ))

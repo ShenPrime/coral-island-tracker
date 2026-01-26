@@ -4,6 +4,7 @@ import { useStore } from "@/store/useStore";
 import { getAltarDetail, updateTempleProgress } from "@/lib/api";
 import { OfferingSection } from "@/components/OfferingSection";
 import { ProgressBar } from "@/components/ProgressBar";
+import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, ArrowLeft, Sprout, Fish, Sparkles, Crown } from "lucide-react";
 import type { AltarWithOfferings } from "@coral-tracker/shared";
 
@@ -88,31 +89,12 @@ export function AltarDetail() {
     }
   };
 
-  if (!currentSaveId) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="card text-center py-12">
-          <AlertCircle size={48} className="mx-auto text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
-            No Save Slot Selected
-          </h2>
-          <p className="text-slate-400 mb-6">
-            Please select a save slot first
-          </p>
-          <Link to="/saves" className="btn btn-primary">
-            Go to Save Slots
-          </Link>
-        </div>
-      </div>
-    );
+if (!currentSaveId) {
+    return <NoSaveSlotWarning message="Please select a save slot first" />;
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ocean-500" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (error || !altar) {

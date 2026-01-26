@@ -7,8 +7,8 @@ import { TrackCategory } from "@/pages/TrackCategory";
 import { LakeTempleOverview } from "@/pages/LakeTempleOverview";
 import { AltarDetail } from "@/pages/AltarDetail";
 import { useStore } from "@/store/useStore";
-import { getCategories, getSaveSlots } from "@/lib/api";
 import { initSession } from "@/lib/session";
+import { useCategories, useSaveSlots } from "@/hooks/useQueries";
 
 function App() {
   const { setCategories, currentSaveId, setCurrentSaveId } = useStore();
@@ -30,27 +30,23 @@ function App() {
     setupSession();
   }, []);
 
-  // Load initial data after session is ready
+  // Use React Query hooks for data fetching (only when session is ready)
+  const { data: categories } = useCategories();
+  const { data: saves } = useSaveSlots();
+
+  // Sync categories to store for sidebar access
   useEffect(() => {
-    if (!sessionReady) return;
-
-    async function loadInitialData() {
-      try {
-        const [categories, saves] = await Promise.all([getCategories(), getSaveSlots()]);
-
-        setCategories(categories);
-
-        // Auto-select first save if none selected
-        if (!currentSaveId && saves.length > 0) {
-          setCurrentSaveId(saves[0]!.id);
-        }
-      } catch (error) {
-        console.error("Failed to load initial data:", error);
-      }
+    if (categories) {
+      setCategories(categories);
     }
+  }, [categories, setCategories]);
 
-    loadInitialData();
-  }, [sessionReady, setCategories, currentSaveId, setCurrentSaveId]);
+  // Auto-select first save if none selected
+  useEffect(() => {
+    if (!currentSaveId && saves && saves.length > 0) {
+      setCurrentSaveId(saves[0]!.id);
+    }
+  }, [saves, currentSaveId, setCurrentSaveId]);
 
   // Show loading state while session initializes
   if (!sessionReady) {

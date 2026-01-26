@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { 
   X, 
   ExternalLink, 
-  ImageIcon, 
   Heart, 
   Cake, 
   Home, 
@@ -19,6 +18,8 @@ import {
   CHARACTER_TYPE_LABELS 
 } from "@coral-tracker/shared";
 import { HeartDisplay } from "./HeartDisplay";
+import { ItemImage } from "./ui";
+import { seasonColors } from "../lib/styles";
 
 // NPC data shape returned from API
 interface NPCData {
@@ -43,13 +44,6 @@ interface NPCModalProps {
   onClose: () => void;
   onUpdateProgress?: (npcId: number, hearts: number, status: RelationshipStatus) => void;
 }
-
-const seasonColors: Record<Season, string> = {
-  spring: "bg-pink-500/30 text-pink-300 border border-pink-400/30",
-  summer: "bg-sand-500/30 text-sand-300 border border-sand-400/30",
-  fall: "bg-orange-500/30 text-orange-300 border border-orange-400/30",
-  winter: "bg-cyan-500/30 text-cyan-300 border border-cyan-400/30",
-};
 
 export function NPCModal({ npc, isOpen, onClose, onUpdateProgress }: NPCModalProps) {
   const [localHearts, setLocalHearts] = useState(npc.hearts);
@@ -237,18 +231,7 @@ export function NPCModal({ npc, isOpen, onClose, onUpdateProgress }: NPCModalPro
         <div className="sticky top-0 bg-deepsea-800/95 backdrop-blur-sm border-b border-ocean-800/50 p-4 flex items-start justify-between z-10">
           <div className="flex items-center gap-4">
             {/* Portrait */}
-            {npc.image_url ? (
-              <img
-                src={npc.image_url}
-                alt={npc.name}
-                className="w-16 h-16 object-contain rounded-lg bg-deepsea-900/50"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-16 h-16 bg-deepsea-900/50 rounded-lg flex items-center justify-center border border-ocean-800/30">
-                <ImageIcon size={28} className="text-ocean-500" />
-              </div>
-            )}
+            <ItemImage src={npc.image_url} alt={npc.name} size="xl" className="rounded-lg" />
             
             <div>
               <h2 className="text-xl font-bold text-white">{npc.name}</h2>

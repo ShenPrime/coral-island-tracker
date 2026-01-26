@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { 
-  ImageIcon, 
   Info, 
   Plus, 
   Minus, 
@@ -14,6 +13,8 @@ import type { NPCMetadata, RelationshipStatus, Season } from "@coral-tracker/sha
 import { RELATIONSHIP_STATUS_LABELS, CHARACTER_TYPE_LABELS } from "@coral-tracker/shared";
 import { CompactHeartDisplay } from "./HeartDisplay";
 import { NPCModal } from "./NPCModal";
+import { ItemImage } from "./ui";
+import { seasonColors, relationshipColors } from "../lib/styles";
 
 // NPC data shape returned from API
 interface NPCData {
@@ -38,19 +39,6 @@ interface NPCCardProps {
   onDecrement?: (npcId: number) => void;
   onUpdateProgress?: (npcId: number, hearts: number, status: RelationshipStatus) => void;
 }
-
-const seasonColors: Record<Season, string> = {
-  spring: "bg-pink-500/30 text-pink-300 border border-pink-400/30",
-  summer: "bg-sand-500/30 text-sand-300 border border-sand-400/30",
-  fall: "bg-orange-500/30 text-orange-300 border border-orange-400/30",
-  winter: "bg-cyan-500/30 text-cyan-300 border border-cyan-400/30",
-};
-
-const relationshipColors: Record<RelationshipStatus, string> = {
-  default: "bg-slate-600/50 text-slate-300 border border-slate-500/30",
-  dating: "bg-pink-600/30 text-pink-300 border border-pink-500/30",
-  married: "bg-coral-600/30 text-coral-300 border border-coral-500/30",
-};
 
 export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPCCardProps) {
   const [showModal, setShowModal] = useState(false);
@@ -114,19 +102,7 @@ export function NPCCard({ npc, onIncrement, onDecrement, onUpdateProgress }: NPC
       >
         <div className="flex items-start gap-3 sm:gap-4">
           {/* NPC Portrait */}
-          {npc.image_url ? (
-            <img
-              src={npc.image_url}
-              alt={npc.name}
-              className="w-12 h-12 sm:w-14 sm:h-14 object-contain flex-shrink-0 rounded-lg bg-deepsea-900/50"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-deepsea-900/50 rounded-lg flex items-center justify-center flex-shrink-0 border border-ocean-800/30">
-              <ImageIcon size={24} className="text-ocean-500" />
-            </div>
-          )}
+          <ItemImage src={npc.image_url} alt={npc.name} size="lg" className="rounded-lg" />
 
           {/* Content */}
           <div className="flex-1 min-w-0">
