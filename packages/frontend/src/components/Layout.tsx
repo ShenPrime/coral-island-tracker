@@ -223,11 +223,14 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen flex">
       {/* Mobile header bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-deepsea-900/95 backdrop-blur-sm border-b border-ocean-800/30 px-4 py-3 flex items-center gap-3">
-        <button
+<button
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-nav"
+          aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
           className="p-2 bg-deepsea-800 rounded-lg text-white border border-ocean-700/50 hover:bg-deepsea-700 transition-colors"
         >
-          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          {sidebarOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
         </button>
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-coral-400 to-coral-600 rounded-lg flex items-center justify-center shadow-lg shadow-coral-500/30">
@@ -237,8 +240,10 @@ export function Layout({ children }: LayoutProps) {
         </Link>
       </div>
 
-      {/* Sidebar */}
+{/* Sidebar */}
       <aside
+        id="sidebar-nav"
+        aria-label="Main navigation"
         className={`
           fixed inset-y-0 left-0 z-40
           bg-gradient-to-b from-deepsea-800 to-deepsea-900 shadow-xl
@@ -271,9 +276,11 @@ export function Layout({ children }: LayoutProps) {
                 const isActive = selectedSeasons.includes(season);
                 const seasonName = season.charAt(0).toUpperCase() + season.slice(1);
                 const button = (
-                  <button
+<button
                     key={season}
                     onClick={() => toggleSeason(season)}
+                    aria-pressed={isActive}
+                    aria-label={`Filter by ${seasonName}`}
                     className={`
                       flex flex-col items-center gap-0.5 rounded-lg
                       border transition-all duration-200 transform-gpu
@@ -284,7 +291,7 @@ export function Layout({ children }: LayoutProps) {
                       }
                     `}
                   >
-                    {config.icon}
+                    <span aria-hidden="true">{config.icon}</span>
                     {!sidebarCollapsed && <span className="text-[10px] font-medium">{config.label}</span>}
                   </button>
                 );
@@ -375,13 +382,14 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </div>
 
-          {/* Collapse Toggle Button - Desktop only */}
+{/* Collapse Toggle Button - Desktop only */}
           <button
             onClick={toggleSidebarCollapsed}
+            aria-expanded={!sidebarCollapsed}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             className="hidden lg:flex absolute bottom-4 right-0 translate-x-1/2 w-6 h-6 bg-deepsea-700 border border-ocean-600/50 rounded-full items-center justify-center text-ocean-300 hover:text-white hover:bg-deepsea-600 transition-colors shadow-lg"
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {sidebarCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+            {sidebarCollapsed ? <ChevronsRight size={14} aria-hidden="true" /> : <ChevronsLeft size={14} aria-hidden="true" />}
           </button>
         </div>
       </aside>
@@ -389,11 +397,12 @@ export function Layout({ children }: LayoutProps) {
       {/* Main content - add top padding on mobile for fixed header */}
       <main className="flex-1 p-4 pt-20 sm:p-6 sm:pt-20 lg:p-8 lg:pt-8">{children}</main>
 
-      {/* Overlay for mobile */}
+{/* Overlay for mobile */}
       {sidebarOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/50 z-30"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 /**
  * Reusable loading spinner component.
  * Supports different sizes and can be used inline or as a full-page loader.
+ * Includes proper ARIA attributes for accessibility.
  */
 
 type SpinnerSize = "sm" | "md" | "lg";
@@ -8,6 +9,8 @@ type SpinnerSize = "sm" | "md" | "lg";
 interface LoadingSpinnerProps {
   size?: SpinnerSize;
   className?: string;
+  /** Accessible label for screen readers */
+  label?: string;
 }
 
 const sizeClasses: Record<SpinnerSize, string> = {
@@ -16,11 +19,19 @@ const sizeClasses: Record<SpinnerSize, string> = {
   lg: "h-12 w-12",
 };
 
-export function LoadingSpinner({ size = "lg", className = "" }: LoadingSpinnerProps) {
+export function LoadingSpinner({ size = "lg", className = "", label = "Loading" }: LoadingSpinnerProps) {
   return (
     <div
-      className={`animate-spin rounded-full border-b-2 border-ocean-500 ${sizeClasses[size]} ${className}`}
-    />
+      role="status"
+      aria-live="polite"
+      className={`${sizeClasses[size]} ${className}`}
+    >
+      <div
+        aria-hidden="true"
+        className={`animate-spin rounded-full border-b-2 border-ocean-500 ${sizeClasses[size]}`}
+      />
+      <span className="sr-only">{label}</span>
+    </div>
   );
 }
 
@@ -32,11 +43,19 @@ interface PageLoaderProps {
  * Full-page centered loading spinner.
  * Use this when loading page content.
  */
-export function PageLoader({ message }: PageLoaderProps) {
+export function PageLoader({ message = "Loading..." }: PageLoaderProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-64 gap-4">
-      <LoadingSpinner size="lg" />
-      {message && <p className="text-slate-400 text-sm">{message}</p>}
+    <div 
+      role="status"
+      aria-live="polite"
+      className="flex flex-col items-center justify-center h-64 gap-4"
+    >
+      <div
+        aria-hidden="true"
+        className="animate-spin rounded-full border-b-2 border-ocean-500 h-12 w-12"
+      />
+      <p className="text-slate-400 text-sm">{message}</p>
+      <span className="sr-only">{message}</span>
     </div>
   );
 }

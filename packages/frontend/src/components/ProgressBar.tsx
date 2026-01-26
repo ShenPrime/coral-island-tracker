@@ -43,8 +43,16 @@ export function ProgressBar({
           )}
         </div>
       )}
-      <div className={`w-full bg-deepsea-900/80 rounded-full ${sizeClasses[size]} border border-ocean-800/30`}>
+<div 
+        role="progressbar"
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={max}
+        aria-label={label || `Progress: ${value} of ${max}`}
+        className={`w-full bg-deepsea-900/80 rounded-full ${sizeClasses[size]} border border-ocean-800/30`}
+      >
         <div
+          aria-hidden="true"
           className={`${colorClasses[color]} ${sizeClasses[size]} rounded-full transition-all duration-500 shadow-lg`}
           style={{ width: `${percentage}%` }}
         />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { ChevronDown, Gift, CheckCircle2 } from "lucide-react";
 import { TempleItemCard } from "./TempleItemCard";
 import { ProgressBar } from "./ProgressBar";
@@ -13,12 +13,15 @@ interface OfferingSectionProps {
 
 export function OfferingSection({ offering, onToggleOffered, defaultExpanded = true }: OfferingSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const contentId = useId();
 
   return (
     <div className={`card overflow-hidden ${offering.is_complete ? "ring-1 ring-palm-500/30" : ""}`}>
-      {/* Header - clickable to expand/collapse */}
+{/* Header - clickable to expand/collapse */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-controls={contentId}
         className="w-full p-4 flex items-center gap-4 hover:bg-ocean-800/20 transition-colors text-left"
       >
 {/* Offering Image */}
@@ -59,18 +62,19 @@ export function OfferingSection({ offering, onToggleOffered, defaultExpanded = t
           </div>
         </div>
 
-        {/* Expand/collapse indicator */}
+{/* Expand/collapse indicator */}
         <ChevronDown
           size={20}
+          aria-hidden="true"
           className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
             isExpanded ? "rotate-180" : ""
           }`}
         />
       </button>
 
-      {/* Expanded content - items grid */}
+{/* Expanded content - items grid */}
       {isExpanded && (
-        <div className="border-t border-ocean-800/30 p-4 bg-deepsea-900/30">
+        <div id={contentId} className="border-t border-ocean-800/30 p-4 bg-deepsea-900/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {offering.items.map((item) => (
               <TempleItemCard

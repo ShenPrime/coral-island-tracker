@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useId } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { 
@@ -216,6 +216,7 @@ function MultiSelectDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -254,9 +255,12 @@ function MultiSelectDropdown({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+<button
         type="button"
         onClick={handleToggle}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
         className={`input w-auto min-w-[100px] sm:min-w-[130px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
           selected.length > 0 ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
         } ${isOpen ? "border-ocean-400" : ""}`}
@@ -265,11 +269,16 @@ function MultiSelectDropdown({
         <ChevronDown 
           size={14} 
           className={`flex-shrink-0 transition-transform duration-300 text-ocean-400 ${isOpen ? "rotate-180" : ""}`} 
+          aria-hidden="true"
         />
       </button>
 
       {isOpen && (
         <div 
+          id={listboxId}
+          role="listbox"
+          aria-label={label}
+          aria-multiselectable="true"
           className={`absolute top-full left-0 mt-1 w-48 border border-ocean-700/50 rounded-lg shadow-2xl z-50 overflow-hidden
             transform-gpu origin-top dropdown-menu
             ${isAnimating ? "dropdown-open" : "dropdown-close"}`}
@@ -281,13 +290,17 @@ function MultiSelectDropdown({
               <button
                 key={option}
                 type="button"
+                role="option"
+                aria-selected={isSelected}
                 onClick={() => onToggle(option)}
                 className="w-full px-3 py-2 flex items-center gap-2 hover:bg-ocean-800/80 text-left text-sm transition-all duration-150 group"
                 style={{ 
                   animationDelay: `${index * 30}ms`,
                 }}
               >
-                <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 
+                <div 
+                  aria-hidden="true"
+                  className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 
                   transform-gpu transition-all duration-200
                   ${isSelected 
                     ? "bg-gradient-to-br from-ocean-400 to-ocean-600 border-ocean-400 shadow-lg shadow-ocean-500/50 scale-110" 
@@ -321,6 +334,7 @@ interface SingleSelectDropdownProps {
 }
 
 function SingleSelectDropdown({
+  label,
   options,
   selected,
   onSelect,
@@ -329,6 +343,7 @@ function SingleSelectDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -370,6 +385,9 @@ function SingleSelectDropdown({
       <button
         type="button"
         onClick={handleToggle}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
         className={`input w-auto min-w-[90px] sm:min-w-[120px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
           selected !== options[0] ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
         } ${isOpen ? "border-ocean-400" : ""}`}
@@ -378,11 +396,15 @@ function SingleSelectDropdown({
         <ChevronDown 
           size={14} 
           className={`flex-shrink-0 transition-transform duration-300 text-ocean-400 ${isOpen ? "rotate-180" : ""}`} 
+          aria-hidden="true"
         />
       </button>
 
       {isOpen && (
         <div 
+          id={listboxId}
+          role="listbox"
+          aria-label={label || "Select option"}
           className={`absolute top-full left-0 mt-1 w-48 border border-ocean-700/50 rounded-lg shadow-2xl z-50 overflow-hidden
             transform-gpu origin-top dropdown-menu
             ${isAnimating ? "dropdown-open" : "dropdown-close"}`}
@@ -394,11 +416,15 @@ function SingleSelectDropdown({
               <button
                 key={option}
                 type="button"
+                role="option"
+                aria-selected={isSelected}
                 onClick={() => handleSelect(option)}
                 className={`w-full px-3 py-2 flex items-center gap-2 hover:bg-ocean-800/80 text-left text-sm transition-all duration-150
                   ${isSelected ? "text-ocean-300" : "text-slate-200"}`}
               >
-                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                <div 
+                  aria-hidden="true"
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
                   isSelected ? "bg-ocean-400 shadow shadow-ocean-400/50" : "bg-transparent"
                 }`} />
                 <span>{formatOption(option)}</span>
@@ -613,14 +639,16 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => setMarriageCandidatesOnly(!marriageCandidatesOnly)}
+              aria-pressed={marriageCandidatesOnly}
               className={`input w-auto text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center gap-2 transition-all duration-200 ${
                 marriageCandidatesOnly 
                   ? "text-pink-300 border-pink-500/50 bg-pink-500/10" 
                   : "text-slate-400"
               }`}
             >
-              <span className={marriageCandidatesOnly ? "text-pink-400" : ""}>♥</span>
+              <span aria-hidden="true" className={marriageCandidatesOnly ? "text-pink-400" : ""}>♥</span>
               <span className="hidden sm:inline">Candidates</span>
+              <span className="sr-only">Marriage candidates only</span>
             </button>
           </>
         )}
