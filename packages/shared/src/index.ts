@@ -287,3 +287,64 @@ export interface ItemTempleStatus {
     offered: boolean;
   }[];
 }
+
+// ============================================
+// Filter Configuration
+// ============================================
+
+// Growth time buckets for crops
+export type GrowthTimeBucket = "fast" | "medium" | "slow";
+export const GROWTH_TIME_BUCKETS: GrowthTimeBucket[] = ["fast", "medium", "slow"];
+export const GROWTH_TIME_LABELS: Record<GrowthTimeBucket, string> = {
+  fast: "Fast (1-4 days)",
+  medium: "Medium (5-8 days)",
+  slow: "Slow (9+ days)",
+};
+
+// Helper function for growth time bucket
+export function getGrowthTimeBucket(days: number): GrowthTimeBucket {
+  if (days <= 4) return "fast";
+  if (days <= 8) return "medium";
+  return "slow";
+}
+
+// Price sort options
+export type PriceSortOption = "none" | "price_low" | "price_high";
+export const PRICE_SORT_OPTIONS: PriceSortOption[] = ["none", "price_low", "price_high"];
+export const PRICE_SORT_LABELS: Record<PriceSortOption, string> = {
+  none: "Sell Price",
+  price_low: "Low → High",
+  price_high: "High → Low",
+};
+
+// Category filter configuration
+export interface CategoryFilterConfig {
+  showSeasons: boolean;
+  showTime: boolean;
+  showLocation: boolean;
+  showRarity: boolean;
+  showEquipment: boolean;
+  showGrowthTime: boolean;
+  showPriceSort: boolean;
+}
+
+export const CATEGORY_FILTER_CONFIG: Record<string, CategoryFilterConfig> = {
+  fish:               { showSeasons: true,  showTime: true,  showLocation: true,  showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  insects:            { showSeasons: true,  showTime: true,  showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  critters:           { showSeasons: true,  showTime: true,  showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  crops:              { showSeasons: true,  showTime: false, showLocation: false, showRarity: false, showEquipment: false, showGrowthTime: true,  showPriceSort: true },
+  "artisan-products": { showSeasons: true,  showTime: false, showLocation: false, showRarity: false, showEquipment: true,  showGrowthTime: false, showPriceSort: true },
+  gems:               { showSeasons: false, showTime: false, showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  artifacts:          { showSeasons: false, showTime: false, showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  forageables:        { showSeasons: true,  showTime: false, showLocation: true,  showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+};
+
+export const DEFAULT_FILTER_CONFIG: CategoryFilterConfig = {
+  showSeasons: true,
+  showTime: false,
+  showLocation: false,
+  showRarity: true,
+  showEquipment: false,
+  showGrowthTime: false,
+  showPriceSort: true,
+};

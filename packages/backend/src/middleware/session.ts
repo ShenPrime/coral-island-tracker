@@ -7,11 +7,7 @@
 
 import { Context, Next } from "hono";
 import { createMiddleware } from "hono/factory";
-import postgres from "postgres";
-
-const connectionString =
-  process.env.DATABASE_URL || "postgres://postgres@localhost:5432/coral_tracker";
-const sql = postgres(connectionString);
+import { sql } from "../db";
 
 // Session type for context
 export interface Session {

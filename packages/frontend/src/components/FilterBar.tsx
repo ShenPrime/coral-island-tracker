@@ -1,7 +1,21 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
-import { SEASONS, TIMES_OF_DAY, type Season, type TimeOfDay, type Rarity } from "@coral-tracker/shared";
+import { 
+  SEASONS, 
+  TIMES_OF_DAY, 
+  GROWTH_TIME_BUCKETS,
+  GROWTH_TIME_LABELS,
+  PRICE_SORT_OPTIONS,
+  PRICE_SORT_LABELS,
+  CATEGORY_FILTER_CONFIG,
+  DEFAULT_FILTER_CONFIG,
+  type Season, 
+  type TimeOfDay, 
+  type Rarity,
+  type GrowthTimeBucket,
+  type PriceSortOption,
+} from "@coral-tracker/shared";
 
 // Format rarity for display (super_rare -> "Super Rare")
 const formatRarity = (rarity: string) => 
@@ -296,17 +310,18 @@ function MultiSelectDropdown({
 }
 
 interface SingleSelectDropdownProps {
-  label: string;
+  label?: string; // Optional, for accessibility/aria
   options: readonly string[];
   selected: string;
   onSelect: (option: string) => void;
+  formatOption?: (option: string) => string;
 }
 
 function SingleSelectDropdown({
-  label,
   options,
   selected,
   onSelect,
+  formatOption = (o) => o,
 }: SingleSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -345,16 +360,18 @@ function SingleSelectDropdown({
     handleClose();
   };
 
+  const displayText = formatOption(selected);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={handleToggle}
         className={`input w-auto min-w-[90px] sm:min-w-[120px] text-sm sm:text-base py-1.5 sm:py-2 px-2 sm:px-4 flex items-center justify-between gap-1 sm:gap-2 transition-all duration-200 ${
-          selected !== label ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
+          selected !== options[0] ? "text-ocean-300 border-ocean-500/50" : "text-slate-400"
         } ${isOpen ? "border-ocean-400" : ""}`}
       >
-        <span className="truncate">{selected}</span>
+        <span className="truncate">{displayText}</span>
         <ChevronDown 
           size={14} 
           className={`flex-shrink-0 transition-transform duration-300 text-ocean-400 ${isOpen ? "rotate-180" : ""}`} 
@@ -363,7 +380,7 @@ function SingleSelectDropdown({
 
       {isOpen && (
         <div 
-          className={`absolute top-full left-0 mt-1 w-40 border border-ocean-700/50 rounded-lg shadow-2xl z-50 overflow-hidden
+          className={`absolute top-full left-0 mt-1 w-48 border border-ocean-700/50 rounded-lg shadow-2xl z-50 overflow-hidden
             transform-gpu origin-top dropdown-menu
             ${isAnimating ? "dropdown-open" : "dropdown-close"}`}
           style={{ backgroundColor: "#162c4a" }}
@@ -381,7 +398,7 @@ function SingleSelectDropdown({
                 <div className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
                   isSelected ? "bg-ocean-400 shadow shadow-ocean-400/50" : "bg-transparent"
                 }`} />
-                <span>{option}</span>
+                <span>{formatOption(option)}</span>
               </button>
             );
           })}
@@ -392,13 +409,22 @@ function SingleSelectDropdown({
 }
 
 interface FilterBarProps {
+  categorySlug?: string;
   availableLocations?: string[];
   availableRarities?: Rarity[];
+  availableEquipment?: string[];
   items?: Array<{ id: number; name: string }>;
   locationLabel?: string;
 }
 
-export function FilterBar({ availableLocations = [], availableRarities = [], items = [], locationLabel = "Location" }: FilterBarProps) {
+export function FilterBar({ 
+  categorySlug,
+  availableLocations = [], 
+  availableRarities = [], 
+  availableEquipment = [],
+  items = [], 
+  locationLabel = "Location" 
+}: FilterBarProps) {
   const {
     searchQuery,
     setSearchQuery,
@@ -410,10 +436,21 @@ export function FilterBar({ availableLocations = [], availableRarities = [], ite
     toggleLocation,
     selectedRarities,
     toggleRarity,
+    selectedEquipment,
+    toggleEquipment,
+    selectedGrowthTime,
+    toggleGrowthTime,
+    priceSort,
+    setPriceSort,
     showCompleted,
     setShowCompleted,
     clearAllFilters,
   } = useStore();
+
+  // Get filter config for this category
+  const config = categorySlug 
+    ? (CATEGORY_FILTER_CONFIG[categorySlug] || DEFAULT_FILTER_CONFIG)
+    : DEFAULT_FILTER_CONFIG;
 
   const hasFilters = 
     searchQuery || 
@@ -421,6 +458,9 @@ export function FilterBar({ availableLocations = [], availableRarities = [], ite
     selectedTimes.length > 0 || 
     selectedLocations.length > 0 || 
     selectedRarities.length > 0 ||
+    selectedEquipment.length > 0 ||
+    selectedGrowthTime.length > 0 ||
+    priceSort !== "none" ||
     showCompleted !== null;
 
   return (
@@ -445,23 +485,27 @@ export function FilterBar({ availableLocations = [], availableRarities = [], ite
         </div>
 
         {/* Season filter */}
-        <MultiSelectDropdown
-          label="Seasons"
-          options={SEASONS}
-          selected={selectedSeasons}
-          onToggle={(s) => toggleSeason(s as Season)}
-        />
+        {config.showSeasons && (
+          <MultiSelectDropdown
+            label="Seasons"
+            options={SEASONS}
+            selected={selectedSeasons}
+            onToggle={(s) => toggleSeason(s as Season)}
+          />
+        )}
 
         {/* Time filter */}
-        <MultiSelectDropdown
-          label="Time"
-          options={TIMES_OF_DAY}
-          selected={selectedTimes}
-          onToggle={(t) => toggleTime(t as TimeOfDay)}
-        />
+        {config.showTime && (
+          <MultiSelectDropdown
+            label="Time"
+            options={TIMES_OF_DAY}
+            selected={selectedTimes}
+            onToggle={(t) => toggleTime(t as TimeOfDay)}
+          />
+        )}
 
         {/* Location filter */}
-        {availableLocations.length > 0 && (
+        {config.showLocation && availableLocations.length > 0 && (
           <MultiSelectDropdown
             label={locationLabel}
             options={availableLocations}
@@ -472,13 +516,46 @@ export function FilterBar({ availableLocations = [], availableRarities = [], ite
         )}
 
         {/* Rarity filter */}
-        {availableRarities.length > 0 && (
+        {config.showRarity && availableRarities.length > 0 && (
           <MultiSelectDropdown
             label="Rarity"
             options={availableRarities}
             selected={selectedRarities}
             onToggle={(r) => toggleRarity(r as Rarity)}
             formatOption={formatRarity}
+          />
+        )}
+
+        {/* Equipment filter (for artisan products) */}
+        {config.showEquipment && availableEquipment.length > 0 && (
+          <MultiSelectDropdown
+            label="Equipment"
+            options={availableEquipment}
+            selected={selectedEquipment}
+            onToggle={toggleEquipment}
+            formatOption={(o) => o}
+          />
+        )}
+
+        {/* Growth Time filter (for crops) */}
+        {config.showGrowthTime && (
+          <MultiSelectDropdown
+            label="Growth"
+            options={[...GROWTH_TIME_BUCKETS]}
+            selected={selectedGrowthTime}
+            onToggle={(b) => toggleGrowthTime(b as GrowthTimeBucket)}
+            formatOption={(b) => GROWTH_TIME_LABELS[b as GrowthTimeBucket]}
+          />
+        )}
+
+        {/* Price Sort */}
+        {config.showPriceSort && (
+          <SingleSelectDropdown
+            label="Sort"
+            options={[...PRICE_SORT_OPTIONS]}
+            selected={priceSort}
+            onSelect={(s) => setPriceSort(s as PriceSortOption)}
+            formatOption={(s) => PRICE_SORT_LABELS[s as PriceSortOption]}
           />
         )}
 

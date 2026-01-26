@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Category, Season, TimeOfDay, Rarity } from "@coral-tracker/shared";
+import type { Category, Season, TimeOfDay, Rarity, GrowthTimeBucket, PriceSortOption } from "@coral-tracker/shared";
 
 interface AppState {
   // Current save slot
@@ -30,6 +30,20 @@ interface AppState {
   selectedRarities: Rarity[];
   toggleRarity: (rarity: Rarity) => void;
   clearRarities: () => void;
+
+  // Equipment filter (for artisan products)
+  selectedEquipment: string[];
+  toggleEquipment: (equipment: string) => void;
+  clearEquipment: () => void;
+
+  // Growth time filter (for crops)
+  selectedGrowthTime: GrowthTimeBucket[];
+  toggleGrowthTime: (bucket: GrowthTimeBucket) => void;
+  clearGrowthTime: () => void;
+
+  // Price sort
+  priceSort: PriceSortOption;
+  setPriceSort: (sort: PriceSortOption) => void;
 
   showCompleted: boolean | null; // null = show all, true = completed only, false = incomplete only
   setShowCompleted: (show: boolean | null) => void;
@@ -98,6 +112,30 @@ export const useStore = create<AppState>()(
         })),
       clearRarities: () => set({ selectedRarities: [] }),
 
+      // Equipment filter (for artisan products)
+      selectedEquipment: [],
+      toggleEquipment: (equipment) =>
+        set((state) => ({
+          selectedEquipment: state.selectedEquipment.includes(equipment)
+            ? state.selectedEquipment.filter((e) => e !== equipment)
+            : [...state.selectedEquipment, equipment],
+        })),
+      clearEquipment: () => set({ selectedEquipment: [] }),
+
+      // Growth time filter (for crops)
+      selectedGrowthTime: [],
+      toggleGrowthTime: (bucket) =>
+        set((state) => ({
+          selectedGrowthTime: state.selectedGrowthTime.includes(bucket)
+            ? state.selectedGrowthTime.filter((b) => b !== bucket)
+            : [...state.selectedGrowthTime, bucket],
+        })),
+      clearGrowthTime: () => set({ selectedGrowthTime: [] }),
+
+      // Price sort
+      priceSort: "none" as PriceSortOption,
+      setPriceSort: (sort) => set({ priceSort: sort }),
+
       showCompleted: null,
       setShowCompleted: (show) => set({ showCompleted: show }),
 
@@ -111,6 +149,9 @@ export const useStore = create<AppState>()(
           selectedTimes: [],
           selectedLocations: [],
           selectedRarities: [],
+          selectedEquipment: [],
+          selectedGrowthTime: [],
+          priceSort: "none" as PriceSortOption,
           showCompleted: null,
         }),
 

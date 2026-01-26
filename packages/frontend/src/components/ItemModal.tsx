@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { X, ImageIcon, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unlock, Tag, Check, Sparkles, Clock, Cloud, MapPin, Gift, Package, Sun } from "lucide-react";
+import { X, ImageIcon, Coins, TrendingUp, Zap, Ruler, Waves, Sprout, RefreshCw, Leaf, Unlock, Tag, Check, Sparkles, Clock, Cloud, MapPin, Gift, Package, Sun, Cog } from "lucide-react";
 import type { Item, Season, Rarity } from "@coral-tracker/shared";
 
 const rarityColors: Record<Rarity, string> = {
@@ -22,12 +22,13 @@ const anyBadgeStyle = "bg-ocean-800/50 text-ocean-300 italic border border-ocean
 
 interface ItemModalProps {
   item: Item & { completed?: boolean; notes?: string | null };
+  categorySlug?: string;
   isOpen: boolean;
   onClose: () => void;
   onToggle?: (itemId: number, completed: boolean) => void;
 }
 
-export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
+export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: ItemModalProps) {
   if (!isOpen) return null;
 
   // Parse metadata if it's a string (from JSON)
@@ -127,53 +128,57 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
             </button>
           )}
 
-          {/* Seasons */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Sparkles size={16} className="text-ocean-400" />
-              Seasons
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {item.seasons && item.seasons.length > 0 ? (
-                item.seasons.map((season) => (
-                  <span
-                    key={season}
-                    className={`px-3 py-1 text-sm font-medium rounded-full ${seasonColors[season as Season] || anyBadgeStyle}`}
-                  >
-                    {season.charAt(0).toUpperCase() + season.slice(1)}
+          {/* Seasons - hide for gems and artifacts (not seasonal) */}
+          {categorySlug !== 'gems' && categorySlug !== 'artifacts' && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Sparkles size={16} className="text-ocean-400" />
+                Seasons
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {item.seasons && item.seasons.length > 0 ? (
+                  item.seasons.map((season) => (
+                    <span
+                      key={season}
+                      className={`px-3 py-1 text-sm font-medium rounded-full ${seasonColors[season as Season] || anyBadgeStyle}`}
+                    >
+                      {season.charAt(0).toUpperCase() + season.slice(1)}
+                    </span>
+                  ))
+                ) : (
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${anyBadgeStyle}`}>
+                    Any Season
                   </span>
-                ))
-              ) : (
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${anyBadgeStyle}`}>
-                  Any Season
-                </span>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Time of Day */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Clock size={16} className="text-sand-400" />
-              Time of Day
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {item.time_of_day && item.time_of_day.length > 0 ? (
-                item.time_of_day.map((time) => (
-                  <span
-                    key={time}
-                    className="px-3 py-1 text-sm font-medium rounded-full bg-sand-500/20 text-sand-300 border border-sand-400/30"
-                  >
-                    {time.charAt(0).toUpperCase() + time.slice(1)}
+          {/* Time of Day - hide for crops, forageables, artisan products, gems, and artifacts */}
+          {categorySlug !== 'crops' && categorySlug !== 'forageables' && categorySlug !== 'artisan-products' && categorySlug !== 'gems' && categorySlug !== 'artifacts' && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Clock size={16} className="text-sand-400" />
+                Time of Day
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {item.time_of_day && item.time_of_day.length > 0 ? (
+                  item.time_of_day.map((time) => (
+                    <span
+                      key={time}
+                      className="px-3 py-1 text-sm font-medium rounded-full bg-sand-500/20 text-sand-300 border border-sand-400/30"
+                    >
+                      {time.charAt(0).toUpperCase() + time.slice(1)}
+                    </span>
+                  ))
+                ) : (
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${anyBadgeStyle}`}>
+                    Any Time
                   </span>
-                ))
-              ) : (
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${anyBadgeStyle}`}>
-                  Any Time
-                </span>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Weather */}
           {item.weather && item.weather.length > 0 && (
@@ -195,8 +200,9 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
             </div>
           )}
 
-          {/* Locations */}
-          {item.locations && item.locations.length > 0 && (
+          {/* Locations - hide for crops and artisan products */}
+          {item.locations && item.locations.length > 0 && 
+           categorySlug !== 'crops' && categorySlug !== 'artisan-products' && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                 <MapPin size={16} className="text-coral-400" />
@@ -316,6 +322,33 @@ export function ItemModal({ item, isOpen, onClose, onToggle }: ItemModalProps) {
                   <RefreshCw size={16} className="text-palm-400 flex-shrink-0" />
                   <span className="text-slate-400">Regrowth:</span>
                   <span className="text-white font-medium">{String(metadata.regrowth_days)} days</span>
+                </div>
+              )}
+
+              {/* Equipment (for artisan products) */}
+              {'equipment' in metadata && metadata.equipment != null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Cog size={16} className="text-ocean-400 flex-shrink-0" />
+                  <span className="text-slate-400">Equipment:</span>
+                  <span className="text-white font-medium">{String(metadata.equipment)}</span>
+                </div>
+              )}
+
+              {/* Input ingredient (for artisan products) */}
+              {'input' in metadata && metadata.input != null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Package size={16} className="text-coral-400 flex-shrink-0" />
+                  <span className="text-slate-400">Made from:</span>
+                  <span className="text-white font-medium">{String(metadata.input)}</span>
+                </div>
+              )}
+
+              {/* Processing time (for artisan products) */}
+              {'processing_time' in metadata && metadata.processing_time != null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock size={16} className="text-sand-400 flex-shrink-0" />
+                  <span className="text-slate-400">Processing:</span>
+                  <span className="text-white font-medium">{String(metadata.processing_time)}</span>
                 </div>
               )}
 

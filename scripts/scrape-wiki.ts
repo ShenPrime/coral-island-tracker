@@ -154,6 +154,61 @@ function parseLocations(text: string): string[] {
 // ============ API Functions ============
 
 /**
+ * Fetch page categories from the wiki API
+ * Returns an array of category names (without "Category:" prefix)
+ */
+async function fetchPageCategories(title: string): Promise<string[]> {
+  const params = new URLSearchParams({
+    action: "query",
+    titles: title,
+    prop: "categories",
+    cllimit: "500",
+    format: "json",
+  });
+
+  await delay(DELAY_MS);
+
+  try {
+    const response = await fetch(`${API_URL}?${params}`);
+    if (!response.ok) return [];
+
+    const data = (await response.json()) as {
+      query?: {
+        pages?: Record<string, { categories?: Array<{ title: string }> }>;
+      };
+    };
+
+    const pages = data.query?.pages;
+    if (!pages) return [];
+
+    const pageData = Object.values(pages)[0];
+    if (!pageData?.categories) return [];
+
+    return pageData.categories.map((c) =>
+      c.title.replace(/^Category:/, "")
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse rarity from page categories
+ * Looks for patterns like "Super rare gem", "Rare fish", "Common artifact"
+ */
+function parseRarityFromCategories(categories: string[]): string | null {
+  for (const cat of categories) {
+    const lower = cat.toLowerCase();
+    if (lower.includes("legendary")) return "legendary";
+    if (lower.includes("super rare")) return "super_rare";
+    if (lower.includes("rare")) return "rare";
+    if (lower.includes("uncommon")) return "uncommon";
+    if (lower.includes("common")) return "common";
+  }
+  return null;
+}
+
+/**
  * Fetch members of a wiki category
  */
 async function fetchCategoryMembers(category: string): Promise<Set<string>> {
@@ -966,7 +1021,13 @@ async function scrapeGems(fastMode: boolean): Promise<ScrapedItem[]> {
     const name = validGems[i]!;
     showProgress(i + 1, validGems.length, name);
 
+    // Fetch page details and categories in parallel-ish (with delay between)
     const details = await fetchItemDetails(name);
+    const categories = await fetchPageCategories(name);
+    
+    // For gems, rarity is in page categories (e.g., "Super rare gem", "Rare gem")
+    const categoryRarity = parseRarityFromCategories(categories);
+    const rarity = categoryRarity || details?.rarity || "common";
 
     const item: ScrapedItem = {
       name,
@@ -974,7 +1035,7 @@ async function scrapeGems(fastMode: boolean): Promise<ScrapedItem[]> {
       time_of_day: [], // N/A
       weather: [],
       locations: details?.locations || ["Mining", "Geodes"],
-      rarity: details?.rarity || "common",
+      rarity,
       base_price: details?.base_price,
       image_url: details?.image_url,
       description: details?.description,

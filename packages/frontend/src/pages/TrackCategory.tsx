@@ -6,13 +6,30 @@ import { ItemCard } from "@/components/ItemCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { getProgressItems, updateProgress, getCategory, getItemsTempleStatus, updateTempleProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
-import { FISHING_LOCATIONS, FORAGING_LOCATIONS, RARITIES } from "@coral-tracker/shared";
+import { 
+  FISHING_LOCATIONS, 
+  FORAGING_LOCATIONS, 
+  RARITIES,
+  CATEGORY_FILTER_CONFIG,
+  DEFAULT_FILTER_CONFIG,
+  getGrowthTimeBucket,
+} from "@coral-tracker/shared";
 import type { Item, Category, ItemTempleStatus, Rarity } from "@coral-tracker/shared";
 
 type ItemWithProgress = Item & { completed: boolean; completed_at: string | null; notes: string | null };
 
-// Categories that support time-of-day filtering
-const CATEGORIES_WITH_TIME = ["fish", "insects", "critters"];
+// Helper to parse metadata (handles string or object)
+function parseMetadata(metadata: unknown): Record<string, unknown> {
+  if (!metadata) return {};
+  if (typeof metadata === 'string') {
+    try {
+      return JSON.parse(metadata);
+    } catch {
+      return {};
+    }
+  }
+  return metadata as Record<string, unknown>;
+}
 
 export function TrackCategory() {
   const { slug } = useParams<{ slug: string }>();
@@ -20,13 +37,20 @@ export function TrackCategory() {
     currentSaveId, 
     searchQuery, 
     setSearchQuery,
-    selectedSeasons, 
+    selectedSeasons,
+    clearSeasons,
     selectedTimes,
     clearTimes,
     selectedLocations,
     clearLocations,
     selectedRarities,
     clearRarities,
+    selectedEquipment,
+    clearEquipment,
+    selectedGrowthTime,
+    clearGrowthTime,
+    priceSort,
+    setPriceSort,
     showCompleted,
     setShowCompleted,
   } = useStore();
@@ -78,20 +102,32 @@ export function TrackCategory() {
 
     // Only clear if slug actually changed
     if (prevSlugRef.current !== slug) {
+      const config = slug 
+        ? (CATEGORY_FILTER_CONFIG[slug] || DEFAULT_FILTER_CONFIG)
+        : DEFAULT_FILTER_CONFIG;
+
       // Always clear these (category-specific)
       clearLocations();
       clearRarities();
+      clearEquipment();
+      clearGrowthTime();
       setSearchQuery("");
       setShowCompleted(null);
+      setPriceSort("none");
 
-      // Clear time filter only if new category doesn't support time-based filtering
-      if (slug && !CATEGORIES_WITH_TIME.includes(slug)) {
+      // Clear time filter if new category doesn't support it
+      if (!config.showTime) {
         clearTimes();
+      }
+
+      // Clear season filter if new category doesn't support it
+      if (!config.showSeasons) {
+        clearSeasons();
       }
 
       prevSlugRef.current = slug;
     }
-  }, [slug, clearLocations, clearRarities, setSearchQuery, setShowCompleted, clearTimes]);
+  }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons]);
 
   const handleToggle = async (itemId: number, completed: boolean) => {
     if (!currentSaveId) return;
@@ -162,6 +198,18 @@ export function TrackCategory() {
     return RARITIES.filter(r => raritiesInCategory.has(r));
   }, [items]);
 
+  // Get available equipment from items (for artisan products)
+  const availableEquipment = useMemo(() => {
+    if (slug !== 'artisan-products') return [];
+    const equipmentSet = new Set<string>();
+    items.forEach(item => {
+      const metadata = parseMetadata(item.metadata);
+      const eq = metadata?.equipment;
+      if (typeof eq === 'string') equipmentSet.add(eq);
+    });
+    return Array.from(equipmentSet).sort();
+  }, [items, slug]);
+
   // Filter items based on all filters
   const filteredItems = items.filter((item) => {
     // Search filter
@@ -209,6 +257,27 @@ export function TrackCategory() {
       }
     }
 
+    // Equipment filter (for artisan products)
+    if (selectedEquipment.length > 0) {
+      const metadata = parseMetadata(item.metadata);
+      const itemEquipment = metadata?.equipment;
+      if (typeof itemEquipment !== 'string' || !selectedEquipment.includes(itemEquipment)) {
+        return false;
+      }
+    }
+
+    // Growth time filter (for crops)
+    if (selectedGrowthTime.length > 0) {
+      const metadata = parseMetadata(item.metadata);
+      const growthDays = Number(metadata?.growth_days);
+      if (isNaN(growthDays)) return false;
+      
+      const bucket = getGrowthTimeBucket(growthDays);
+      if (!selectedGrowthTime.includes(bucket)) {
+        return false;
+      }
+    }
+
     // Completion filter
     if (showCompleted !== null) {
       if (showCompleted && !item.completed) return false;
@@ -218,8 +287,21 @@ export function TrackCategory() {
     return true;
   });
 
+  // Sort items based on priceSort
+  const sortedItems = useMemo(() => {
+    if (priceSort === "none") return filteredItems;
+    
+    return [...filteredItems].sort((a, b) => {
+      const priceA = a.base_price || 0;
+      const priceB = b.base_price || 0;
+      return priceSort === "price_high" 
+        ? priceB - priceA 
+        : priceA - priceB;
+    });
+  }, [filteredItems, priceSort]);
+
   const completedCount = items.filter((i) => i.completed).length;
-  const filteredCompletedCount = filteredItems.filter((i) => i.completed).length;
+  const sortedCompletedCount = sortedItems.filter((i) => i.completed).length;
 
   if (!currentSaveId) {
     return (
@@ -275,13 +357,15 @@ export function TrackCategory() {
 
       {/* Filters */}
       <FilterBar 
+        categorySlug={slug}
         availableLocations={availableLocations}
         availableRarities={availableRarities}
+        availableEquipment={availableEquipment}
         items={items} 
       />
 
       {/* Items grid */}
-      {filteredItems.length === 0 ? (
+      {sortedItems.length === 0 ? (
         <div className="card text-center py-8 sm:py-12">
           <p className="text-slate-400 text-sm sm:text-base">
             {items.length === 0
@@ -292,10 +376,10 @@ export function TrackCategory() {
       ) : (
         <>
           <p className="text-xs sm:text-sm text-slate-400 mb-3 sm:mb-4">
-            Showing {filteredItems.length} items ({filteredCompletedCount} completed)
+            Showing {sortedItems.length} items ({sortedCompletedCount} completed)
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {filteredItems.map((item) => (
+            {sortedItems.map((item) => (
               <ItemCard 
                 key={item.id} 
                 item={item}

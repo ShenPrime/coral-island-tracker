@@ -212,25 +212,27 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
                   </>
                 ) : (
                   <>
-                    {/* Seasons */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      <Sparkles size={12} className="text-slate-400 flex-shrink-0 sm:hidden" />
-                      <Sparkles size={14} className="text-slate-400 flex-shrink-0 hidden sm:block" />
-                      {item.seasons && item.seasons.length > 0 ? (
-                        item.seasons.map((season) => (
-                          <span
-                            key={season}
-                            className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${seasonColors[season as Season] || anyBadgeStyle}`}
-                          >
-                            {season}
+                    {/* Seasons - hide for gems and artifacts (not seasonal) */}
+                    {categorySlug !== 'gems' && categorySlug !== 'artifacts' && (
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <Sparkles size={12} className="text-slate-400 flex-shrink-0 sm:hidden" />
+                        <Sparkles size={14} className="text-slate-400 flex-shrink-0 hidden sm:block" />
+                        {item.seasons && item.seasons.length > 0 ? (
+                          item.seasons.map((season) => (
+                            <span
+                              key={season}
+                              className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${seasonColors[season as Season] || anyBadgeStyle}`}
+                            >
+                              {season}
+                            </span>
+                          ))
+                        ) : (
+                          <span className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${anyBadgeStyle}`}>
+                            Any Season
                           </span>
-                        ))
-                      ) : (
-                        <span className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${anyBadgeStyle}`}>
-                          Any Season
-                        </span>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Locations - hide for crops and artisan products */}
                     {item.locations && item.locations.length > 0 && 
@@ -277,8 +279,8 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
                           </div>
                         )}
                       </>
-                    ) : categorySlug === 'forageables' ? (
-                      // Forageables: Hide time of day entirely (not relevant)
+                    ) : categorySlug === 'forageables' || categorySlug === 'gems' || categorySlug === 'artifacts' ? (
+                      // Forageables, Gems, Artifacts: Hide time of day entirely (not relevant)
                       null
                     ) : (
                       // Default: Show time of day (fish, insects, critters, etc.)
@@ -371,7 +373,8 @@ export function ItemCard({ item, categorySlug, onToggle, showDetails = true, tem
 
       {/* Modal */}
       <ItemModal 
-        item={item} 
+        item={item}
+        categorySlug={categorySlug}
         isOpen={showModal} 
         onClose={() => setShowModal(false)}
         onToggle={onToggle}
