@@ -61,8 +61,8 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
           </button>
         )}
 
-        {/* Seasons - hide for gems and artifacts (not seasonal) */}
-        {categorySlug !== 'gems' && categorySlug !== 'artifacts' && (
+        {/* Seasons - hide for gems, artifacts, and cooking (not seasonal) */}
+        {categorySlug !== 'gems' && categorySlug !== 'artifacts' && categorySlug !== 'cooking' && (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <Sparkles size={16} className="text-ocean-400" />
@@ -87,8 +87,8 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
           </div>
         )}
 
-        {/* Time of Day - hide for crops, forageables, artisan products, gems, and artifacts */}
-        {categorySlug !== 'crops' && categorySlug !== 'forageables' && categorySlug !== 'artisan-products' && categorySlug !== 'gems' && categorySlug !== 'artifacts' && (
+        {/* Time of Day - hide for crops, forageables, artisan products, gems, artifacts, and cooking */}
+        {categorySlug !== 'crops' && categorySlug !== 'forageables' && categorySlug !== 'artisan-products' && categorySlug !== 'gems' && categorySlug !== 'artifacts' && categorySlug !== 'cooking' && (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <Clock size={16} className="text-sand-400" />
@@ -302,6 +302,94 @@ export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: Ite
                 <span className="text-white font-medium">{String(metadata.type)}</span>
               </div>
             )}
+
+            {/* Cooking-specific: Utensil */}
+            {'utensil' in metadata && metadata.utensil != null && (
+              <div className="flex items-center gap-2 text-sm">
+                <Cog size={16} className="text-ocean-400 flex-shrink-0" />
+                <span className="text-slate-400">Utensil:</span>
+                <span className="text-white font-medium">{String(metadata.utensil)}</span>
+              </div>
+            )}
+
+            {/* Cooking-specific: Energy/Health restoration */}
+            {'energy_restored' in metadata && metadata.energy_restored != null && (
+              <div className="flex items-center gap-2 text-sm">
+                <Zap size={16} className="text-palm-400 flex-shrink-0" />
+                <span className="text-slate-400">Restores:</span>
+                <span className="text-white font-medium">
+                  +{String(metadata.energy_restored)} energy
+                  {'health_restored' in metadata && metadata.health_restored != null && (
+                    <span> / +{String(metadata.health_restored)} health</span>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {/* Cooking-specific: Recipe source */}
+            {'recipe_source' in metadata && metadata.recipe_source != null && (
+              <div className="flex items-center gap-2 text-sm">
+                <Gift size={16} className="text-coral-400 flex-shrink-0" />
+                <span className="text-slate-400">Recipe:</span>
+                <span className="text-white font-medium">{String(metadata.recipe_source)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Cooking-specific: Buffs section with duration by quality */}
+        {'buffs' in metadata && Array.isArray(metadata.buffs) && metadata.buffs.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <TrendingUp size={16} className="text-palm-400" />
+              Buffs
+            </h3>
+            <div className="space-y-3 bg-deepsea-900/50 p-3 rounded-lg border border-ocean-800/30">
+              {(metadata.buffs as Array<{ type: string; bonus?: string; value?: number; duration?: string; durations?: { base?: string; bronze?: string; silver?: string; gold?: string; osmium?: string } }>).map((buff, idx) => (
+                <div key={idx} className="space-y-2">
+                  {/* Buff type and bonus */}
+                  <div className="text-sm font-medium text-palm-300">
+                    {buff.bonus || (buff.value ? `+${buff.value}` : '')} {buff.type}
+                  </div>
+                  
+                  {/* Duration by quality tier */}
+                  {buff.durations && Object.keys(buff.durations).length > 0 ? (
+                    <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                      {["base", "bronze", "silver", "gold", "osmium"].map((quality) => (
+                        <div key={quality} className="space-y-0.5">
+                          <div className={`font-medium capitalize ${qualityTextColors[quality]}`}>
+                            {quality}
+                          </div>
+                          <div className="text-ocean-300">
+                            {buff.durations?.[quality as keyof typeof buff.durations] || "-"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : buff.duration ? (
+                    <div className="text-xs text-ocean-400">Duration: {buff.duration}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cooking-specific: Ingredients list */}
+        {'ingredients' in metadata && Array.isArray(metadata.ingredients) && metadata.ingredients.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Package size={16} className="text-coral-400" />
+              Ingredients ({(metadata.ingredients as Array<{ name: string; quantity: number }>).length})
+            </h3>
+            <div className="space-y-1.5 bg-deepsea-900/50 p-3 rounded-lg border border-ocean-800/30">
+              {(metadata.ingredients as Array<{ name: string; quantity: number }>).map((ing, idx) => (
+                <div key={idx} className="flex items-center justify-between text-sm">
+                  <span className="text-ocean-200">{ing.name}</span>
+                  <span className="text-sand-300 font-medium">x{ing.quantity}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

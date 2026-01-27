@@ -337,6 +337,7 @@ export const CATEGORY_FILTER_CONFIG: Record<string, CategoryFilterConfig> = {
   gems:               { showSeasons: false, showTime: false, showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
   artifacts:          { showSeasons: false, showTime: false, showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
   forageables:        { showSeasons: true,  showTime: false, showLocation: true,  showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  cooking:            { showSeasons: false, showTime: false, showLocation: false, showRarity: false, showEquipment: true,  showGrowthTime: false, showPriceSort: true },
 };
 
 export const DEFAULT_FILTER_CONFIG: CategoryFilterConfig = {
@@ -465,3 +466,96 @@ export const NPC_RESIDENCES = [
 ] as const;
 
 export type NPCResidence = (typeof NPC_RESIDENCES)[number] | string;
+
+// ============================================
+// Cooking Types
+// ============================================
+
+// Buff duration by quality tier
+export interface BuffDurations {
+  base?: string;
+  bronze?: string;
+  silver?: string;
+  gold?: string;
+  osmium?: string;
+}
+
+// Cooking buff with type, bonus, and durations
+export interface CookingBuff {
+  type: string;              // "Farming", "Fishing", etc.
+  bonus: string;             // "+10%" or "+2"
+  durations?: BuffDurations; // Duration by quality tier
+}
+
+// Cooking metadata stored in items.metadata JSON field
+export interface CookingMetadata {
+  ingredients?: Array<{ name: string; quantity: number }>;
+  utensil?: string;
+  energy_restored?: number;
+  health_restored?: number;
+  buffs?: CookingBuff[];
+  recipe_source?: string;              // Clean display: "Emily 4 ♥" or "Manual cooking"
+  recipe_source_character?: string;    // "Emily" (for potential future filtering)
+  recipe_source_hearts?: number;       // 4 (for potential future filtering)
+  recipe_source_category?: RecipeSource;
+  output_quantity?: number;
+  item_type?: string;                  // "Consumable"
+}
+
+// Cooking utensils
+export const COOKING_UTENSILS = [
+  "Oven",
+  "Blender",
+  "Pot",
+  "Frying pan",
+  "Cutting board",
+  "Steamer",
+  "Ceramic bowl",
+  "Tortilla press",
+] as const;
+
+export type CookingUtensil = (typeof COOKING_UTENSILS)[number];
+
+// Buff types from cooking
+export const COOKING_BUFF_TYPES = [
+  "Farming",
+  "Fishing",
+  "Mining",
+  "Foraging",
+  "Combat",
+  "Speed",
+  "Luck",
+  "Defense",
+  "Max Energy",
+] as const;
+
+export type CookingBuffType = (typeof COOKING_BUFF_TYPES)[number];
+
+// Recipe source categories
+export const RECIPE_SOURCES = [
+  "Starting",
+  "General Store",
+  "Friendship",
+  "Quest",
+  "Other",
+] as const;
+
+export type RecipeSource = (typeof RECIPE_SOURCES)[number];
+
+// Energy gain buckets for filtering (will adjust based on actual data)
+export type EnergyGainBucket = "low" | "medium" | "high" | "very_high";
+export const ENERGY_GAIN_BUCKETS: EnergyGainBucket[] = ["low", "medium", "high", "very_high"];
+export const ENERGY_GAIN_LABELS: Record<EnergyGainBucket, string> = {
+  low: "Low (1-50)",
+  medium: "Medium (51-100)",
+  high: "High (101-150)",
+  very_high: "Very High (150+)",
+};
+
+// Helper function to get energy gain bucket
+export function getEnergyGainBucket(energy: number): EnergyGainBucket {
+  if (energy <= 50) return "low";
+  if (energy <= 100) return "medium";
+  if (energy <= 150) return "high";
+  return "very_high";
+}

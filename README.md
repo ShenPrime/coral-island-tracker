@@ -5,7 +5,7 @@ A comprehensive web-based progress tracker for the game Coral Island. Track your
 ## Features
 
 ### Core Tracking
-- **9 Categories**: Fish, Insects, Critters, Crops, Artifacts, Gems, Forageables, Artisan Products, NPCs
+- **10 Categories**: Fish, Insects, Critters, Crops, Artifacts, Gems, Forageables, Artisan Products, Cooking, NPCs
 - **Multiple Save Slots**: Track different playthroughs separately
 - **Real-time Progress**: Visual progress bars with completion percentages
 - **Wiki Integration**: Direct links to Coral Island Wiki for each item
@@ -28,6 +28,7 @@ A comprehensive web-based progress tracker for the game Coral Island. Track your
   - Fish: Season, Time, Location, Rarity
   - Crops: Season, Growth Time
   - Artisan Products: Season, Equipment
+  - Cooking: Utensil, Buff Type, Recipe Source, Energy Gain
   - NPCs: Birthday Season, Character Type, Residence, Marriage Candidates
 - **Price Sorting**: Sort by sell price (low to high or high to low)
 - **Completion Filter**: Show all, completed only, or incomplete only
@@ -112,6 +113,7 @@ bun run scrape gems
 bun run scrape forageables
 bun run scrape artisan-products
 bun run scrape npcs
+bun run scrape cooking
 ```
 
 ### 5. Run Migrations
@@ -259,6 +261,7 @@ bun run scrape crops --fast --clear
 | `forageables` | Name, seasons, locations, sell price |
 | `artisan-products` | Name, equipment needed, seasons, sell price |
 | `npcs` | Name, birthday, residence, character type, marriage status, gift preferences |
+| `cooking` | Name, utensil, ingredients, energy/health restored, buffs with durations, recipe source |
 
 ### Notes
 
@@ -354,6 +357,7 @@ Migrations are run manually as needed:
 | Gems | Mineable gems and minerals | Rarity-based |
 | Forageables | Wild items to collect | Location filter |
 | Artisan Products | Crafted goods | Equipment filter |
+| Cooking | Food and drink recipes | Utensil, buff type, energy gain, recipe source filters |
 | NPCs | Villagers and characters | Heart-based tracking, relationship status |
 
 ## Contributing
@@ -378,7 +382,16 @@ Contributions are welcome! Here's how to get started:
 
 ## Changelog
 
-### v0.4.0 (Current)
+### v0.5.0 (Current)
+- **Cooking Recipes**: New category for tracking cooking recipes
+  - Scrapes recipe data from wiki including ingredients, utensil, energy/health restoration
+  - Buff system with durations by quality tier (base, bronze, silver, gold, osmium)
+  - Clean recipe source display (e.g., "Emily 4 ♥" instead of raw wiki text)
+  - Filters: Utensil, Buff Type, Recipe Source, Energy Gain
+- **Modal Improvements**: Cooking modal shows relevant info only (hides seasons/time)
+- **Filter Enhancements**: Dynamic utensil filter for cooking category
+
+### v0.4.0
 - **Accessibility**: Comprehensive keyboard navigation system
   - Global shortcuts: `?` (help), `Shift+H/S/T` (navigation), `1-9`/`0` (categories), `/` (search)
   - Grid navigation: Arrow keys/hjkl, Enter/Space to toggle, `i` for details
@@ -431,7 +444,7 @@ Contributions are welcome! Here's how to get started:
 - [ ] Export/import progress as JSON
 - [ ] Calendar integration (birthdays, seasonal events)
 - [ ] Achievement tracking
-- [ ] Cooking recipes tracking
+- [x] Cooking recipes tracking
 - [ ] Museum collection tracking
 - [ ] Diving location tracking
 - [ ] Farm animal tracking

@@ -14,12 +14,16 @@ import {
   CATEGORY_FILTER_CONFIG,
   DEFAULT_FILTER_CONFIG,
   CHARACTER_TYPE_LABELS,
+  ENERGY_GAIN_BUCKETS,
+  ENERGY_GAIN_LABELS,
   type Season, 
   type TimeOfDay, 
   type Rarity,
   type GrowthTimeBucket,
   type PriceSortOption,
   type CharacterType,
+  type EnergyGainBucket,
+  type RecipeSource,
 } from "@coral-tracker/shared";
 
 // Format rarity for display (super_rare -> "Super Rare")
@@ -487,6 +491,9 @@ interface FilterBarProps {
   availableResidences?: string[];
   availableCharacterTypes?: CharacterType[];
   availableBirthdaySeasons?: Season[];
+  // Cooking-specific
+  availableBuffTypes?: string[];
+  availableRecipeSources?: RecipeSource[];
   items?: Array<{ id: number; name: string }>;
   locationLabel?: string;
 }
@@ -499,6 +506,8 @@ export function FilterBar({
   availableResidences = [],
   availableCharacterTypes = [],
   availableBirthdaySeasons = [],
+  availableBuffTypes = [],
+  availableRecipeSources = [],
   items = [], 
   locationLabel = "Location" 
 }: FilterBarProps) {
@@ -528,6 +537,13 @@ export function FilterBar({
     setMarriageCandidatesOnly,
     selectedBirthdaySeason,
     setBirthdaySeason,
+    // Cooking filters
+    selectedBuffTypes,
+    toggleBuffType,
+    selectedRecipeSources,
+    toggleRecipeSource,
+    selectedEnergyGain,
+    toggleEnergyGain,
     showCompleted,
     setShowCompleted,
     clearAllFilters,
@@ -535,6 +551,8 @@ export function FilterBar({
 
   // Check if this is the NPC category
   const isNPCCategory = categorySlug === "npcs";
+  // Check if this is the cooking category
+  const isCookingCategory = categorySlug === "cooking";
 
   // Get filter config for this category
   const config = categorySlug 
@@ -554,6 +572,9 @@ export function FilterBar({
     selectedResidences.length > 0 ||
     marriageCandidatesOnly ||
     selectedBirthdaySeason !== null ||
+    selectedBuffTypes.length > 0 ||
+    selectedRecipeSources.length > 0 ||
+    selectedEnergyGain.length > 0 ||
     showCompleted !== null;
 
   // Get keyboard navigation context
@@ -597,6 +618,13 @@ export function FilterBar({
       indices.marriageCandidates = index++;
     }
     
+    // Cooking-specific
+    if (isCookingCategory) {
+      if (availableBuffTypes.length > 0) indices.buffType = index++;
+      if (availableRecipeSources.length > 0) indices.recipeSource = index++;
+      indices.energyGain = index++;
+    }
+    
     // Price sort (not for NPCs)
     if (config.showPriceSort && !isNPCCategory) indices.priceSort = index++;
     
@@ -607,7 +635,7 @@ export function FilterBar({
     if (hasFilters) indices.clear = index++;
     
     return indices;
-  }, [config, availableLocations.length, availableRarities.length, availableEquipment.length, isNPCCategory, availableBirthdaySeasons.length, availableCharacterTypes.length, availableResidences.length, hasFilters]);
+  }, [config, availableLocations.length, availableRarities.length, availableEquipment.length, isNPCCategory, isCookingCategory, availableBirthdaySeasons.length, availableCharacterTypes.length, availableResidences.length, availableBuffTypes.length, availableRecipeSources.length, hasFilters]);
 
   return (
     <div className="card mb-6 relative z-20">
@@ -694,10 +722,10 @@ export function FilterBar({
           />
         )}
 
-        {/* Equipment filter (for artisan products) */}
+        {/* Equipment filter (for artisan products) / Utensil filter (for cooking) */}
         {config.showEquipment && availableEquipment.length > 0 && (
           <MultiSelectDropdown
-            label="Equipment"
+            label={categorySlug === 'cooking' ? "Utensil" : "Equipment"}
             options={availableEquipment}
             selected={selectedEquipment}
             onToggle={toggleEquipment}
@@ -784,6 +812,51 @@ export function FilterBar({
               <span className="hidden sm:inline">Candidates</span>
               <span className="sr-only">Marriage candidates only</span>
             </button>
+          </>
+        )}
+
+        {/* Cooking-specific filters */}
+        {isCookingCategory && (
+          <>
+            {/* Buff Type filter */}
+            {availableBuffTypes.length > 0 && (
+              <MultiSelectDropdown
+                label="Buff"
+                options={availableBuffTypes}
+                selected={selectedBuffTypes}
+                onToggle={toggleBuffType}
+                formatOption={(b) => b}
+                buttonRef={filterNav.registerFilter(filterIndices.buffType)}
+                tabIndex={filterNav.getTabIndex(filterIndices.buffType)}
+                isFilterFocused={filterNav.isFocused(filterIndices.buffType)}
+              />
+            )}
+
+            {/* Recipe Source filter */}
+            {availableRecipeSources.length > 0 && (
+              <MultiSelectDropdown
+                label="Source"
+                options={availableRecipeSources}
+                selected={selectedRecipeSources}
+                onToggle={(s) => toggleRecipeSource(s as RecipeSource)}
+                formatOption={(s) => s}
+                buttonRef={filterNav.registerFilter(filterIndices.recipeSource)}
+                tabIndex={filterNav.getTabIndex(filterIndices.recipeSource)}
+                isFilterFocused={filterNav.isFocused(filterIndices.recipeSource)}
+              />
+            )}
+
+            {/* Energy Gain filter */}
+            <MultiSelectDropdown
+              label="Energy"
+              options={[...ENERGY_GAIN_BUCKETS]}
+              selected={selectedEnergyGain}
+              onToggle={(b) => toggleEnergyGain(b as EnergyGainBucket)}
+              formatOption={(b) => ENERGY_GAIN_LABELS[b as EnergyGainBucket]}
+              buttonRef={filterNav.registerFilter(filterIndices.energyGain)}
+              tabIndex={filterNav.getTabIndex(filterIndices.energyGain)}
+              isFilterFocused={filterNav.isFocused(filterIndices.energyGain)}
+            />
           </>
         )}
 

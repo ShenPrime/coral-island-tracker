@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Check, MapPin, Clock, Cloud, Sparkles, Info, Gift, Package, Sun, Sprout, Cog } from "lucide-react";
+import { Check, MapPin, Clock, Cloud, Sparkles, Info, Gift, Package, Sun, Sprout, Cog, Zap } from "lucide-react";
 import type { Item, Season, ItemTempleStatus } from "@coral-tracker/shared";
 import { ItemImage } from "./ui";
 import { rarityColors, rarityCardStyles, seasonColors, anyBadgeStyle } from "../lib/styles";
@@ -233,6 +233,35 @@ const handleClick = () => {
                             <Clock size={12} className="flex-shrink-0 mt-0.5 text-sand-400 sm:hidden" />
                             <Clock size={14} className="flex-shrink-0 mt-0.5 text-sand-400 hidden sm:block" />
                             <span>{String(itemMetadata.processing_time)}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : categorySlug === 'cooking' ? (
+                      // Cooking: Show utensil, energy/health, ingredients count
+                      <>
+                        {itemMetadata.utensil && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Cog size={12} className="flex-shrink-0 mt-0.5 text-ocean-400 sm:hidden" />
+                            <Cog size={14} className="flex-shrink-0 mt-0.5 text-ocean-400 hidden sm:block" />
+                            <span>{String(itemMetadata.utensil)}</span>
+                          </div>
+                        )}
+                        {(itemMetadata.energy_restored || itemMetadata.health_restored) && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Zap size={12} className="flex-shrink-0 mt-0.5 text-palm-400 sm:hidden" />
+                            <Zap size={14} className="flex-shrink-0 mt-0.5 text-palm-400 hidden sm:block" />
+                            <span>
+                              {itemMetadata.energy_restored ? `+${String(itemMetadata.energy_restored)} energy` : null}
+                              {itemMetadata.energy_restored && itemMetadata.health_restored ? ' / ' : null}
+                              {itemMetadata.health_restored ? `+${String(itemMetadata.health_restored)} health` : null}
+                            </span>
+                          </div>
+                        )}
+                        {Array.isArray(itemMetadata.ingredients) && itemMetadata.ingredients.length > 0 && (
+                          <div className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm text-ocean-300/80">
+                            <Package size={12} className="flex-shrink-0 mt-0.5 text-coral-400 sm:hidden" />
+                            <Package size={14} className="flex-shrink-0 mt-0.5 text-coral-400 hidden sm:block" />
+                            <span>{itemMetadata.ingredients.length} ingredients</span>
                           </div>
                         )}
                       </>

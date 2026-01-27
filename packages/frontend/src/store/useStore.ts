@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Category, Season, TimeOfDay, Rarity, GrowthTimeBucket, PriceSortOption, CharacterType } from "@coral-tracker/shared";
+import type { Category, Season, TimeOfDay, Rarity, GrowthTimeBucket, PriceSortOption, CharacterType, EnergyGainBucket, RecipeSource } from "@coral-tracker/shared";
 
 interface AppState {
   // Current save slot
@@ -59,6 +59,19 @@ interface AppState {
 
   selectedBirthdaySeason: Season | null;
   setBirthdaySeason: (season: Season | null) => void;
+
+  // Cooking-specific filters
+  selectedBuffTypes: string[];
+  toggleBuffType: (buffType: string) => void;
+  clearBuffTypes: () => void;
+
+  selectedRecipeSources: RecipeSource[];
+  toggleRecipeSource: (source: RecipeSource) => void;
+  clearRecipeSources: () => void;
+
+  selectedEnergyGain: EnergyGainBucket[];
+  toggleEnergyGain: (bucket: EnergyGainBucket) => void;
+  clearEnergyGain: () => void;
 
   showCompleted: boolean | null; // null = show all, true = completed only, false = incomplete only
   setShowCompleted: (show: boolean | null) => void;
@@ -184,6 +197,34 @@ export const useStore = create<AppState>()(
       selectedBirthdaySeason: null,
       setBirthdaySeason: (season) => set({ selectedBirthdaySeason: season }),
 
+      // Cooking-specific filters
+      selectedBuffTypes: [],
+      toggleBuffType: (buffType) =>
+        set((state) => ({
+          selectedBuffTypes: state.selectedBuffTypes.includes(buffType)
+            ? state.selectedBuffTypes.filter((b) => b !== buffType)
+            : [...state.selectedBuffTypes, buffType],
+        })),
+      clearBuffTypes: () => set({ selectedBuffTypes: [] }),
+
+      selectedRecipeSources: [],
+      toggleRecipeSource: (source) =>
+        set((state) => ({
+          selectedRecipeSources: state.selectedRecipeSources.includes(source)
+            ? state.selectedRecipeSources.filter((s) => s !== source)
+            : [...state.selectedRecipeSources, source],
+        })),
+      clearRecipeSources: () => set({ selectedRecipeSources: [] }),
+
+      selectedEnergyGain: [],
+      toggleEnergyGain: (bucket) =>
+        set((state) => ({
+          selectedEnergyGain: state.selectedEnergyGain.includes(bucket)
+            ? state.selectedEnergyGain.filter((b) => b !== bucket)
+            : [...state.selectedEnergyGain, bucket],
+        })),
+      clearEnergyGain: () => set({ selectedEnergyGain: [] }),
+
       showCompleted: null,
       setShowCompleted: (show) => set({ showCompleted: show }),
 
@@ -204,6 +245,9 @@ export const useStore = create<AppState>()(
           selectedResidences: [],
           marriageCandidatesOnly: false,
           selectedBirthdaySeason: null,
+          selectedBuffTypes: [],
+          selectedRecipeSources: [],
+          selectedEnergyGain: [],
           showCompleted: null,
         }),
 

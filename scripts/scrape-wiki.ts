@@ -1809,6 +1809,585 @@ async function scrapeLakeTemple(_fastMode: boolean): Promise<ScrapedItem[]> {
   return items;
 }
 
+// ============ Cooking Scraper ============
+
+/**
+ * Recipe source categories for filtering
+ */
+type RecipeSourceCategory = "Starting" | "General Store" | "Friendship" | "Quest" | "Other";
+
+/**
+ * Categorize recipe source text for filtering
+ */
+function categorizeRecipeSource(source: string): RecipeSourceCategory {
+  const lower = source.toLowerCase();
+  
+  // Check for friendship patterns like "Sam 3 hearts", "Aaliyah ♥♥♥", "Raj 3"
+  if (lower.includes("heart") || source.includes("♥") || /\b\d+\s*♥/.test(source) || 
+      /^[a-z]+\s+\d+$/i.test(source.trim())) {
+    return "Friendship";
+  }
+  
+  // Check for store purchases - "General Store", "store", "shop", prices like "2500g"
+  if (lower.includes("store") || lower.includes("shop") || lower.includes("purchase") || 
+      lower.includes("buy") || /\d+\s*g\b/.test(lower)) {
+    return "General Store";
+  }
+  
+  // Check for quests
+  if (lower.includes("quest") || lower.includes("reward") || lower.includes("complete") ||
+      lower.includes("mission")) {
+    return "Quest";
+  }
+  
+  // Check for starting/default recipes
+  if (lower.includes("start") || lower.includes("default") || lower.includes("known") ||
+      lower.includes("initial") || lower === "-" || lower === "n/a") {
+    return "Starting";
+  }
+  
+  return "Other";
+}
+
+/**
+ * Parse recipe source HTML into clean, display-friendly text
+ * Examples:
+ *   - "Emily 4 ♥" (from friendship)
+ *   - "Catching level 2" (from skill)
+ *   - "Manual cooking" (when no specific source)
+ */
+function parseRecipeSource(html: string): {
+  display: string;
+  character?: string;
+  hearts?: number;
+  source_type: RecipeSourceCategory;
+} {
+  // First, get the stripped text for analysis
+  const text = stripHtml(html);
+  
+  // Extract character name from title attribute (first link is usually the character)
+  const charMatch = html.match(/<a[^>]*title="([^"/]+)"[^>]*>/i);
+  let character = charMatch?.[1]?.trim();
+  
+  // Filter out non-character links (like "Friendship", "Letters", etc.)
+  if (character && (
+    character.toLowerCase().includes("letter") ||
+    character.toLowerCase().includes("friendship") ||
+    character.toLowerCase().includes("heart") ||
+    character.toLowerCase() === "mail"
+  )) {
+    character = undefined;
+  }
+  
+  // Extract heart level - patterns like "4 ♥", "(4 hearts)", "4 hearts", or just "4" after a name
+  const heartsMatch = text.match(/(\d+)\s*(?:♥|hearts?|\((\d+)\s*hearts?\))/i) ||
+                      (character ? text.match(new RegExp(`${character}\\s*(\\d+)`, "i")) : null);
+  const hearts = heartsMatch ? parseInt(heartsMatch[1] || heartsMatch[2]!, 10) : undefined;
+  
+  // Check for skill level pattern like "Catching level 2"
+  const skillMatch = text.match(/(Catching|Fishing|Farming|Mining|Foraging|Combat|Ranching|Diving)\s*(?:level|mastery)?\s*(\d+)/i);
+  
+  // Build clean display text
+  let display = "";
+  if (character && hearts) {
+    display = `${character} ${hearts} ♥`;
+  } else if (skillMatch) {
+    display = `${skillMatch[1]} level ${skillMatch[2]}`;
+  } else {
+    // Clean up any remaining text
+    display = text
+      .replace(/\/Letters.*$/i, "")           // Remove "/Letters#Recipe_name"
+      .replace(/\([^)]*hearts?\)/gi, "")      // Remove "(X hearts)" patterns
+      .replace(/♥+/g, "")                     // Remove heart symbols
+      .replace(/\s+/g, " ")                   // Collapse whitespace
+      .trim();
+  }
+  
+  // If display is empty, just whitespace, or unhelpful, default to "Manual cooking"
+  if (!display || display === "-" || display === "N/A" || display.length < 2) {
+    display = "Manual cooking";
+  }
+  
+  const source_type = categorizeRecipeSource(html + " " + text);
+  
+  return { display, character, hearts, source_type };
+}
+
+/**
+ * Parse buffs from text like "+2 Farming (7 min)" or "Farming +2 for 7 min"
+ * Returns array of { type, value, duration }
+ */
+function parseBuffs(text: string): Array<{ type: string; value: number; duration: string }> {
+  const buffs: Array<{ type: string; value: number; duration: string }> = [];
+  
+  // Known buff types
+  const buffTypes = [
+    "Farming", "Fishing", "Mining", "Foraging", "Combat", 
+    "Speed", "Luck", "Defense", "Max Energy", "Attack",
+    "Max Stamina", "Max Health"
+  ];
+  
+  for (const buffType of buffTypes) {
+    // Pattern 1: "+2 Farming (7 min)" or "+2 Farming 7 min"
+    const pattern1 = new RegExp(`[+]?(\\d+)\\s*${buffType}[^\\d]*(\\d+\\s*(?:min|hour|sec|m|h|s))`, "i");
+    // Pattern 2: "Farming +2 (7 min)" or "Farming +2 for 7 min"
+    const pattern2 = new RegExp(`${buffType}\\s*[+]?(\\d+)[^\\d]*(\\d+\\s*(?:min|hour|sec|m|h|s))`, "i");
+    // Pattern 3: Just "+2 Farming" without duration (assume standard duration)
+    const pattern3 = new RegExp(`[+](\\d+)\\s*${buffType}(?!\\d)`, "i");
+    
+    let match = text.match(pattern1) || text.match(pattern2);
+    if (match) {
+      buffs.push({
+        type: buffType,
+        value: parseInt(match[1]!, 10),
+        duration: match[2]!.replace(/\s+/g, " ").trim(),
+      });
+    } else {
+      match = text.match(pattern3);
+      if (match) {
+        buffs.push({
+          type: buffType,
+          value: parseInt(match[1]!, 10),
+          duration: "7 min", // Default duration
+        });
+      }
+    }
+  }
+  
+  return buffs;
+}
+
+/**
+ * Parse ingredients from the icon-list HTML structure used in the cooking table
+ * Returns array of { name, quantity }
+ */
+function parseCookingIngredients(html: string): Array<{ name: string; quantity: number }> {
+  const ingredients: Array<{ name: string; quantity: number }> = [];
+  
+  // Look for custom-icon elements within the cell
+  // Pattern: <a ... title="ItemName">...</a> followed by optional quantity like "× 2" or "x2"
+  const iconRegex = /<a[^>]*title="([^"]+)"[^>]*>[\s\S]*?<\/a>(?:[\s\S]*?(?:×|x)\s*(\d+))?/gi;
+  
+  let match;
+  while ((match = iconRegex.exec(html)) !== null) {
+    const name = match[1]?.trim();
+    if (name && !name.includes(":") && name.length < 100) {
+      const quantity = match[2] ? parseInt(match[2], 10) : 1;
+      // Avoid duplicates
+      if (!ingredients.some(i => i.name === name)) {
+        ingredients.push({ name, quantity });
+      }
+    }
+  }
+  
+  // Fallback: try extracting from plain text if no icons found
+  if (ingredients.length === 0) {
+    const text = stripHtml(html);
+    // Split by bullet points or line breaks
+    const parts = text.split(/[•\n,]+/);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed && trimmed.length > 1 && trimmed.length < 50) {
+        // Check for quantity pattern "Item × 2" or "2× Item"
+        const qtyMatch = trimmed.match(/^(.+?)\s*(?:×|x)\s*(\d+)$/i) || 
+                        trimmed.match(/^(\d+)\s*(?:×|x)\s*(.+)$/i);
+        if (qtyMatch) {
+          const name = (qtyMatch[1]!.match(/^\d+$/) ? qtyMatch[2] : qtyMatch[1])!.trim();
+          const qty = parseInt(qtyMatch[1]!.match(/^\d+$/) ? qtyMatch[1]! : qtyMatch[2]!, 10);
+          ingredients.push({ name, quantity: qty });
+        } else {
+          ingredients.push({ name: trimmed, quantity: 1 });
+        }
+      }
+    }
+  }
+  
+  return ingredients;
+}
+
+/**
+ * Parse energy and health restoration from the "Restores" column
+ * Returns { energy, health } or nulls
+ */
+function parseRestoration(text: string): { energy: number | null; health: number | null } {
+  const result: { energy: number | null; health: number | null } = { energy: null, health: null };
+  
+  // Clean up the text
+  const cleaned = stripHtml(text).toLowerCase();
+  
+  // Pattern: "125 energy" or "energy: 125" or just a number
+  const energyMatch = cleaned.match(/(\d+)\s*(?:energy|stamina)/i) || 
+                      cleaned.match(/(?:energy|stamina)[:\s]*(\d+)/i);
+  if (energyMatch) {
+    result.energy = parseInt(energyMatch[1]!, 10);
+  }
+  
+  // Pattern: "56 health" or "health: 56"
+  const healthMatch = cleaned.match(/(\d+)\s*(?:health|hp)/i) ||
+                      cleaned.match(/(?:health|hp)[:\s]*(\d+)/i);
+  if (healthMatch) {
+    result.health = parseInt(healthMatch[1]!, 10);
+  }
+  
+  // If only one number and no keywords, assume it's energy
+  if (result.energy === null && result.health === null) {
+    const numMatch = cleaned.match(/(\d+)/);
+    if (numMatch) {
+      result.energy = parseInt(numMatch[1]!, 10);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Parse cooking-specific data from an individual recipe page's infobox
+ * Extracts energy, health, buffs, and buff durations by quality tier
+ */
+function parseCookingInfobox(html: string): {
+  buffs: Array<{ type: string; bonus: string; durations?: { base?: string; bronze?: string; silver?: string; gold?: string; osmium?: string } }>;
+  energy_restored: number | null;
+  health_restored: number | null;
+  item_type: string | null;
+} {
+  const result: {
+    buffs: Array<{ type: string; bonus: string; durations?: { base?: string; bronze?: string; silver?: string; gold?: string; osmium?: string } }>;
+    energy_restored: number | null;
+    health_restored: number | null;
+    item_type: string | null;
+  } = {
+    buffs: [],
+    energy_restored: null,
+    health_restored: null,
+    item_type: null,
+  };
+  
+  // Helper to extract data-source values from div format
+  const extractDataValue = (source: string): string | null => {
+    const regex = new RegExp(
+      `data-source="${source}"[^>]*>[\\s\\S]*?<div[^>]*class="[^"]*pi-data-value[^"]*"[^>]*>([\\s\\S]*?)</div>`,
+      "i"
+    );
+    const match = html.match(regex);
+    return match ? stripHtml(match[1]) : null;
+  };
+  
+  // Helper to extract data-source values from td format (horizontal tables)
+  const extractTdValue = (source: string): string | null => {
+    const regex = new RegExp(
+      `<td[^>]*data-source="${source}"[^>]*>([\\s\\S]*?)</td>`,
+      "i"
+    );
+    const match = html.match(regex);
+    return match ? stripHtml(match[1]) : null;
+  };
+  
+  // Try various field names for energy/stamina
+  const energy = extractDataValue("energy") || extractDataValue("stamina") || 
+                 extractDataValue("restore") || extractDataValue("restores");
+  if (energy) {
+    const restoration = parseRestoration(energy);
+    result.energy_restored = restoration.energy;
+    result.health_restored = restoration.health;
+  }
+  
+  // Try health separately if not found
+  if (result.health_restored === null) {
+    const health = extractDataValue("health") || extractDataValue("hp");
+    if (health) {
+      const numMatch = health.match(/(\d+)/);
+      if (numMatch) {
+        result.health_restored = parseInt(numMatch[1]!, 10);
+      }
+    }
+  }
+  
+  // Extract item type (e.g., "Consumable")
+  const itemType = extractDataValue("type");
+  if (itemType) {
+    result.item_type = itemType;
+  }
+  
+  // Extract buff type and bonus value
+  const buffType = extractDataValue("buff") || extractDataValue("buff type");
+  const buffBonus = extractDataValue("buff bonus") || extractDataValue("bonus");
+  
+  // Extract buff durations by quality tier from horizontal table
+  // Wiki uses data-source attributes: duration, bronzeduration, silverduration, goldduration, osmiumduration
+  const baseDuration = extractTdValue("duration") || extractDataValue("duration");
+  const bronzeDuration = extractTdValue("bronzeduration") || extractDataValue("bronzeduration");
+  const silverDuration = extractTdValue("silverduration") || extractDataValue("silverduration");
+  const goldDuration = extractTdValue("goldduration") || extractDataValue("goldduration");
+  const osmiumDuration = extractTdValue("osmiumduration") || extractDataValue("osmiumduration");
+  
+  // Build buff object if we have buff type info
+  if (buffType && buffType !== "-" && buffType.toLowerCase() !== "none") {
+    const durations: { base?: string; bronze?: string; silver?: string; gold?: string; osmium?: string } = {};
+    
+    if (baseDuration && baseDuration !== "-") durations.base = baseDuration;
+    if (bronzeDuration && bronzeDuration !== "-") durations.bronze = bronzeDuration;
+    if (silverDuration && silverDuration !== "-") durations.silver = silverDuration;
+    if (goldDuration && goldDuration !== "-") durations.gold = goldDuration;
+    if (osmiumDuration && osmiumDuration !== "-") durations.osmium = osmiumDuration;
+    
+    result.buffs.push({
+      type: buffType,
+      bonus: buffBonus || "+?",
+      durations: Object.keys(durations).length > 0 ? durations : undefined,
+    });
+  }
+  
+  // Fallback: try parsing buffs from text if no structured data found
+  if (result.buffs.length === 0) {
+    const buffText = extractDataValue("buff") || extractDataValue("buffs") || extractDataValue("effect");
+    if (buffText) {
+      const parsedBuffs = parseBuffs(buffText);
+      // Convert old format to new format
+      result.buffs = parsedBuffs.map(b => ({
+        type: b.type,
+        bonus: `+${b.value}`,
+        durations: { base: b.duration },
+      }));
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Scrape cooking recipes from the wiki
+ * Uses the main Cooking page table for basic data, then fetches individual pages for details
+ */
+async function scrapeCooking(fastMode: boolean): Promise<ScrapedItem[]> {
+  const items: ScrapedItem[] = [];
+  const processedNames = new Set<string>();
+  
+  console.log("  Fetching Cooking page...");
+  const cookingPageHtml = await fetchPageHtml("Cooking");
+  
+  if (!cookingPageHtml) {
+    console.error("  Failed to fetch Cooking page");
+    return items;
+  }
+  
+  // Find the recipe table - it has class "fandom-table article-table sortable"
+  // and contains columns: Product, Ingredients, Crafting medium, Restores, Recipe source
+  const tableMatch = cookingPageHtml.match(
+    /<table[^>]*class="[^"]*fandom-table[^"]*article-table[^"]*sortable[^"]*"[^>]*>([\s\S]*?)<\/table>/i
+  );
+  
+  if (!tableMatch) {
+    console.error("  Could not find recipe table on Cooking page");
+    // Fallback: try fetching from category
+    console.log("  Falling back to Category:Cooked_dishes...");
+    const recipeNames = await fetchCategoryMembers("Category:Cooked_dishes");
+    for (const name of recipeNames) {
+      if (!processedNames.has(name)) {
+        processedNames.add(name);
+        items.push({ name, seasons: [], time_of_day: [], weather: [] });
+      }
+    }
+    return items;
+  }
+  
+  const tableHtml = tableMatch[0];
+  
+  // Parse table rows
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  let rowIndex = 0;
+  
+  // Temporary storage for table data
+  const tableData: Array<{
+    name: string;
+    outputQuantity: number;
+    ingredients: Array<{ name: string; quantity: number }>;
+    utensil: string;
+    energy: number | null;
+    health: number | null;
+    recipeSource: string;
+    recipeSourceCharacter?: string;
+    recipeSourceHearts?: number;
+    recipeSourceCategory: RecipeSourceCategory;
+  }> = [];
+  
+  while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
+    rowIndex++;
+    if (rowIndex === 1) continue; // Skip header row
+    
+    const rowHtml = rowMatch[1]!;
+    
+    // Extract cells
+    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells: string[] = [];
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
+      cells.push(cellMatch[1]!);
+    }
+    
+    if (cells.length < 5) continue;
+    
+    // Column 0: Product - extract name from link title and quantity
+    const productCell = cells[0]!;
+    const nameMatch = productCell.match(/<a[^>]*title="([^"]+)"[^>]*>/i);
+    if (!nameMatch) continue;
+    
+    const name = nameMatch[1]!.trim();
+    if (processedNames.has(name)) continue;
+    processedNames.add(name);
+    
+    // Extract output quantity (e.g., "× 2")
+    const quantityMatch = productCell.match(/(?:×|x)\s*(\d+)/i);
+    const outputQuantity = quantityMatch ? parseInt(quantityMatch[1]!, 10) : 1;
+    
+    // Column 1: Ingredients
+    const ingredientsCell = cells[1]!;
+    const ingredients = parseCookingIngredients(ingredientsCell);
+    
+    // Column 2: Crafting medium (utensil)
+    const utensilCell = cells[2]!;
+    const utensilMatch = utensilCell.match(/<a[^>]*title="([^"]+)"[^>]*>/i);
+    const utensil = utensilMatch ? utensilMatch[1]!.trim() : stripHtml(utensilCell).trim();
+    
+    // Column 3: Restores (energy/health)
+    const restoresCell = cells[3]!;
+    const restoration = parseRestoration(restoresCell);
+    
+    // Column 4: Recipe source - parse the HTML for clean display
+    const recipeSourceCell = cells[4]!;
+    const parsedSource = parseRecipeSource(recipeSourceCell);
+    
+    tableData.push({
+      name,
+      outputQuantity,
+      ingredients,
+      utensil,
+      energy: restoration.energy,
+      health: restoration.health,
+      recipeSource: parsedSource.display,
+      recipeSourceCharacter: parsedSource.character,
+      recipeSourceHearts: parsedSource.hearts,
+      recipeSourceCategory: parsedSource.source_type,
+    });
+  }
+  
+  console.log(`  Found ${tableData.length} recipes in table`);
+  
+  if (fastMode) {
+    // Fast mode: use table data only
+    for (const data of tableData) {
+      const metadata: Record<string, unknown> = {
+        ingredients: data.ingredients,
+        utensil: data.utensil,
+        recipe_source: data.recipeSource,
+        recipe_source_category: data.recipeSourceCategory,
+      };
+      
+      // Add optional recipe source fields
+      if (data.recipeSourceCharacter) metadata.recipe_source_character = data.recipeSourceCharacter;
+      if (data.recipeSourceHearts) metadata.recipe_source_hearts = data.recipeSourceHearts;
+      
+      if (data.energy !== null) metadata.energy_restored = data.energy;
+      if (data.health !== null) metadata.health_restored = data.health;
+      if (data.outputQuantity > 1) metadata.output_quantity = data.outputQuantity;
+      
+      items.push({
+        name: data.name,
+        seasons: [],
+        time_of_day: [],
+        weather: [],
+        metadata,
+      });
+    }
+    return items;
+  }
+  
+  // Full mode: fetch individual pages for images, prices, descriptions, and buffs
+  console.log("  Fetching individual recipe pages...");
+  
+  for (let i = 0; i < tableData.length; i++) {
+    const data = tableData[i]!;
+    showProgress(i + 1, tableData.length, data.name);
+    
+    // Fetch page details
+    const pageHtml = await fetchPageHtml(data.name);
+    let details: Partial<ScrapedItem> | null = null;
+    let cookingDetails: ReturnType<typeof parseCookingInfobox> | null = null;
+    
+    if (pageHtml) {
+      details = parseInfobox(pageHtml);
+      cookingDetails = parseCookingInfobox(pageHtml);
+    }
+    
+    // Build metadata
+    const metadata: Record<string, unknown> = {
+      ingredients: data.ingredients,
+      utensil: data.utensil,
+      recipe_source: data.recipeSource,
+      recipe_source_category: data.recipeSourceCategory,
+    };
+    
+    // Add optional recipe source fields
+    if (data.recipeSourceCharacter) metadata.recipe_source_character = data.recipeSourceCharacter;
+    if (data.recipeSourceHearts) metadata.recipe_source_hearts = data.recipeSourceHearts;
+    
+    // Use page data for energy/health if available, fall back to table data
+    const energy = cookingDetails?.energy_restored ?? data.energy;
+    const health = cookingDetails?.health_restored ?? data.health;
+    
+    if (energy !== null) metadata.energy_restored = energy;
+    if (health !== null) metadata.health_restored = health;
+    if (data.outputQuantity > 1) metadata.output_quantity = data.outputQuantity;
+    
+    // Add item type from page if available
+    if (cookingDetails?.item_type) {
+      metadata.item_type = cookingDetails.item_type;
+    }
+    
+    // Add buffs from page (now includes durations by quality)
+    if (cookingDetails?.buffs && cookingDetails.buffs.length > 0) {
+      metadata.buffs = cookingDetails.buffs;
+    }
+    
+    // Merge prices from details (calculate per-item if output > 1)
+    if (details?.metadata?.prices) {
+      const prices = details.metadata.prices as Record<string, number>;
+      if (data.outputQuantity > 1) {
+        // Convert to per-item prices
+        const perItemPrices: Record<string, number> = {};
+        for (const [quality, price] of Object.entries(prices)) {
+          perItemPrices[quality] = Math.floor(price / data.outputQuantity);
+        }
+        metadata.prices = perItemPrices;
+      } else {
+        metadata.prices = prices;
+      }
+    }
+    
+    // Calculate base_price (per item)
+    let basePrice = details?.base_price;
+    if (basePrice && data.outputQuantity > 1) {
+      basePrice = Math.floor(basePrice / data.outputQuantity);
+    }
+    
+    const item: ScrapedItem = {
+      name: data.name,
+      seasons: [],
+      time_of_day: [],
+      weather: [],
+      base_price: basePrice,
+      image_url: details?.image_url,
+      description: details?.description,
+      metadata,
+    };
+    
+    items.push(item);
+  }
+  
+  clearProgress();
+  return items;
+}
+
 // ============ NPC Scraper ============
 
 /**
@@ -2248,6 +2827,7 @@ async function main() {
     gems: scrapeGems,
     forageables: scrapeForageables,
     "artisan-products": scrapeArtisanProducts,
+    cooking: scrapeCooking,
     npcs: scrapeNPCs,
     // Note: lake-temple is now handled via migration, not scraper
   };

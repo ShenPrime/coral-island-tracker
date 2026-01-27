@@ -20,8 +20,10 @@ import {
   CATEGORY_FILTER_CONFIG,
   DEFAULT_FILTER_CONFIG,
   getGrowthTimeBucket,
+  getEnergyGainBucket,
+  RECIPE_SOURCES,
 } from "@coral-tracker/shared";
-import type { Rarity, Season, CharacterType, RelationshipStatus } from "@coral-tracker/shared";
+import type { Rarity, Season, CharacterType, RelationshipStatus, RecipeSource } from "@coral-tracker/shared";
 
 // Query hooks
 import { 
@@ -101,12 +103,21 @@ export function TrackCategory() {
     setMarriageCandidatesOnly,
     selectedBirthdaySeason,
     setBirthdaySeason,
+    // Cooking filters
+    selectedBuffTypes,
+    clearBuffTypes,
+    selectedRecipeSources,
+    clearRecipeSources,
+    selectedEnergyGain,
+    clearEnergyGain,
     showCompleted,
     setShowCompleted,
   } = useStore();
 
   // Check if this is the NPC category
   const isNPCCategory = slug === "npcs";
+  // Check if this is the cooking category
+  const isCookingCategory = slug === "cooking";
 
   // Track previous slug to detect category changes
   const prevSlugRef = useRef<string | undefined>(undefined);
@@ -197,6 +208,11 @@ export function TrackCategory() {
       setMarriageCandidatesOnly(false);
       setBirthdaySeason(null);
 
+      // Clear cooking-specific filters
+      clearBuffTypes();
+      clearRecipeSources();
+      clearEnergyGain();
+
       // Clear time filter if new category doesn't support it
       if (!config.showTime) {
         clearTimes();
@@ -209,7 +225,7 @@ export function TrackCategory() {
 
       prevSlugRef.current = slug;
     }
-  }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons, clearCharacterTypes, clearResidences, setMarriageCandidatesOnly, setBirthdaySeason]);
+  }, [slug, clearLocations, clearRarities, clearEquipment, clearGrowthTime, setSearchQuery, setShowCompleted, setPriceSort, clearTimes, clearSeasons, clearCharacterTypes, clearResidences, setMarriageCandidatesOnly, setBirthdaySeason, clearBuffTypes, clearRecipeSources, clearEnergyGain]);
 
   // ============================================================
   // Event handlers (using mutations) - memoized for stable references
@@ -287,13 +303,14 @@ export function TrackCategory() {
     return RARITIES.filter(r => raritiesInCategory.has(r));
   }, [items]);
 
-  // Get available equipment from items (for artisan products)
+  // Get available equipment from items (for artisan products and cooking utensils)
   const availableEquipment = useMemo(() => {
-    if (slug !== 'artisan-products') return [];
+    if (slug !== 'artisan-products' && slug !== 'cooking') return [];
     const equipmentSet = new Set<string>();
     items.forEach(item => {
       const metadata = parseMetadata(item.metadata);
-      const eq = metadata?.equipment;
+      // Artisan products use 'equipment', cooking uses 'utensil'
+      const eq = metadata?.equipment || metadata?.utensil;
       if (typeof eq === 'string') equipmentSet.add(eq);
     });
     return Array.from(equipmentSet).sort();
@@ -333,6 +350,35 @@ export function TrackCategory() {
     // Return in standard season order
     return SEASONS.filter((s) => seasonSet.has(s));
   }, [npcs, isNPCCategory]);
+
+  // Get available buff types from cooking items
+  const availableBuffTypes = useMemo(() => {
+    if (!isCookingCategory) return [];
+    const buffTypeSet = new Set<string>();
+    items.forEach(item => {
+      const metadata = parseMetadata(item.metadata);
+      const buffs = metadata?.buffs as Array<{ type: string }> | undefined;
+      if (Array.isArray(buffs)) {
+        buffs.forEach(buff => {
+          if (buff.type) buffTypeSet.add(buff.type);
+        });
+      }
+    });
+    return Array.from(buffTypeSet).sort();
+  }, [items, isCookingCategory]);
+
+  // Get available recipe sources from cooking items
+  const availableRecipeSources = useMemo(() => {
+    if (!isCookingCategory) return [] as RecipeSource[];
+    const sourceSet = new Set<RecipeSource>();
+    items.forEach(item => {
+      const metadata = parseMetadata(item.metadata);
+      const source = metadata?.recipe_source_category as RecipeSource | undefined;
+      if (source) sourceSet.add(source);
+    });
+    // Return in standard order from RECIPE_SOURCES
+    return RECIPE_SOURCES.filter((s) => sourceSet.has(s));
+  }, [items, isCookingCategory]);
 
   // ============================================================
   // Filter items
@@ -384,10 +430,11 @@ export function TrackCategory() {
       }
     }
 
-    // Equipment filter (for artisan products)
+    // Equipment/Utensil filter (for artisan products and cooking)
     if (selectedEquipment.length > 0) {
       const metadata = parseMetadata(item.metadata);
-      const itemEquipment = metadata?.equipment;
+      // Artisan products use 'equipment', cooking uses 'utensil'
+      const itemEquipment = metadata?.equipment || metadata?.utensil;
       if (typeof itemEquipment !== 'string' || !selectedEquipment.includes(itemEquipment)) {
         return false;
       }
@@ -402,6 +449,38 @@ export function TrackCategory() {
       const bucket = getGrowthTimeBucket(growthDays);
       if (!selectedGrowthTime.includes(bucket)) {
         return false;
+      }
+    }
+
+    // Cooking filters
+    if (isCookingCategory) {
+      const metadata = parseMetadata(item.metadata);
+      
+      // Buff type filter (match ANY selected buff type)
+      if (selectedBuffTypes.length > 0) {
+        const buffs = metadata?.buffs as Array<{ type: string }> | undefined;
+        if (!Array.isArray(buffs) || !buffs.some(b => selectedBuffTypes.includes(b.type))) {
+          return false;
+        }
+      }
+
+      // Recipe source filter
+      if (selectedRecipeSources.length > 0) {
+        const source = metadata?.recipe_source_category as RecipeSource | undefined;
+        if (!source || !selectedRecipeSources.includes(source)) {
+          return false;
+        }
+      }
+
+      // Energy gain filter
+      if (selectedEnergyGain.length > 0) {
+        const energy = Number(metadata?.energy_restored);
+        if (isNaN(energy) || energy <= 0) return false;
+        
+        const bucket = getEnergyGainBucket(energy);
+        if (!selectedEnergyGain.includes(bucket)) {
+          return false;
+        }
       }
     }
 
@@ -615,6 +694,8 @@ export function TrackCategory() {
         availableResidences={availableResidences}
         availableCharacterTypes={availableCharacterTypes}
         availableBirthdaySeasons={availableBirthdaySeasons}
+        availableBuffTypes={availableBuffTypes}
+        availableRecipeSources={availableRecipeSources}
         items={isNPCCategory ? npcs.map(n => ({ id: n.id, name: n.name })) : items} 
       />
 
