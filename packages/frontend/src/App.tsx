@@ -9,6 +9,7 @@ import { AltarDetail } from "@/pages/AltarDetail";
 import { KeyboardShortcutsPanel } from "@/components/KeyboardShortcutsPanel";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { NewVersionBanner } from "@/components/NewVersionBanner";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { KeyboardNavigationProvider } from "@/context/KeyboardNavigationContext";
 import { useStore } from "@/store/useStore";
 import { initSession } from "@/lib/session";
@@ -16,7 +17,7 @@ import { useCategories, useSaveSlots } from "@/hooks/useQueries";
 import { usePrefetchAll } from "@/hooks/usePrefetchAll";
 
 function App() {
-  const { setCategories, currentSaveId, setCurrentSaveId } = useStore();
+  const { setCategories, currentSaveId, setCurrentSaveId, setGlobalSearchOpen } = useStore();
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
@@ -34,6 +35,19 @@ function App() {
 
     setupSession();
   }, []);
+
+  // Global keyboard shortcut for search (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setGlobalSearchOpen]);
 
   // Use React Query hooks for data fetching (only when session is ready)
   const { data: categories } = useCategories();
@@ -87,6 +101,7 @@ function App() {
       {/* Fixed overlay banners - outside document flow */}
       <OfflineBanner />
       <NewVersionBanner />
+      <GlobalSearch />
       
       <div className="flex flex-col min-h-screen">
         <Layout>

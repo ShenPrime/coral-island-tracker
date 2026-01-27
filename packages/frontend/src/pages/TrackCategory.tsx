@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useStore } from "@/store/useStore";
 import { FilterBar } from "@/components/FilterBar";
 import { ItemCard } from "@/components/ItemCard";
@@ -77,6 +77,7 @@ function parseMetadata(metadata: unknown): Record<string, unknown> {
 
 export function TrackCategory() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { 
     currentSaveId, 
     searchQuery, 
@@ -560,6 +561,42 @@ export function TrackCategory() {
         : priceA - priceB;
     });
   }, [filteredItems, priceSort]);
+
+  // ============================================================
+  // Handle openItem query param (from global search navigation)
+  // ============================================================
+
+  useEffect(() => {
+    const openItemId = searchParams.get('openItem');
+    if (!openItemId) return;
+
+    // Wait for data to be loaded
+    if (isNPCCategory) {
+      if (npcs.length === 0) return;
+      const npc = npcs.find(n => n.id === Number(openItemId));
+      if (npc) {
+        // Set search to filter down to this NPC
+        setSearchQuery(npc.name);
+        // Open the modal
+        setSelectedNPC(npc);
+        // Clear the query param to avoid reopening on refresh
+        searchParams.delete('openItem');
+        setSearchParams(searchParams, { replace: true });
+      }
+    } else {
+      if (items.length === 0) return;
+      const item = items.find(i => i.id === Number(openItemId));
+      if (item) {
+        // Set search to filter down to this item
+        setSearchQuery(item.name);
+        // Open the modal
+        setSelectedItem(item);
+        // Clear the query param to avoid reopening on refresh
+        searchParams.delete('openItem');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, setSearchParams, isNPCCategory, items, npcs, setSearchQuery]);
 
   // ============================================================
   // Calculate counts

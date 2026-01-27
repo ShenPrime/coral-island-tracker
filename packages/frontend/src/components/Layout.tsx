@@ -23,6 +23,7 @@ import {
   Snowflake,
   ChevronsLeft,
   ChevronsRight,
+  Search,
 } from "lucide-react";
 
 // Tooltip component for collapsed sidebar - uses portal to escape overflow:hidden
@@ -276,6 +277,31 @@ return (
               </div>
             )}
           </Link>
+
+          {/* Global Search Button */}
+          <Tooltip content="Search (Ctrl+K)" enabled={sidebarCollapsed}>
+            <button
+              onClick={() => useStore.getState().setGlobalSearchOpen(true)}
+              aria-label="Search (Ctrl+K)"
+              className={`
+                w-full mb-4 flex items-center gap-2 px-3 py-2 rounded-lg
+                bg-ocean-800/30 border border-ocean-700/30
+                text-ocean-300 hover:text-white hover:bg-ocean-700/30 hover:border-ocean-600/50
+                transition-colors
+                ${sidebarCollapsed ? "justify-center" : ""}
+              `}
+            >
+              <Search size={18} />
+              {!sidebarCollapsed && (
+                <>
+                  <span className="flex-1 text-left text-sm">Search...</span>
+                  <kbd className="text-[10px] bg-ocean-800/50 px-1.5 py-0.5 rounded border border-ocean-700/50">
+                    Ctrl+K
+                  </kbd>
+                </>
+              )}
+            </button>
+          </Tooltip>
 
           {/* Season Selector */}
           <div className="mb-6">

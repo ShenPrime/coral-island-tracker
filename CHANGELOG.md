@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## v0.5.0 (Current)
+- **Global Search**: Quick search across all items, NPCs, altars, and temple offerings with `Ctrl+K` / `Cmd+K`
+  - Autocomplete results with category badges
+  - Keyboard navigation (arrow keys, Enter to select)
+  - Navigates to item's page, scrolls to the item card, and opens its detail modal
+  - Search temple offering sections (e.g., "Summer Sesajen", "Fresh Water Fish") to navigate directly to that section
 - **Cooking Recipes**: New category for tracking cooking recipes
   - Scrapes recipe data from wiki including ingredients, utensil, energy/health restoration
   - Buff system with durations by quality tier (base, bronze, silver, gold, osmium)

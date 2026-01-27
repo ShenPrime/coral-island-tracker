@@ -92,6 +92,10 @@ interface AppState {
   isShortcutsModalOpen: boolean;
   setShortcutsModalOpen: (open: boolean) => void;
   
+  // Global search
+  globalSearchOpen: boolean;
+  setGlobalSearchOpen: (open: boolean) => void;
+  
   // Grid focus persistence (per category slug)
   gridFocusIndex: Record<string, number>;
   setGridFocusIndex: (category: string, index: number) => void;
@@ -261,6 +265,10 @@ export const useStore = create<AppState>()(
       // Keyboard navigation
       isShortcutsModalOpen: false,
       setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
+      
+      // Global search
+      globalSearchOpen: false,
+      setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
       
       // Grid focus persistence
       gridFocusIndex: {},

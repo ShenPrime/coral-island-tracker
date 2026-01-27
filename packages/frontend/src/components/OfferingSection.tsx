@@ -60,7 +60,10 @@ export function OfferingSection({
   }, [focusedItemIndex]);
 
   return (
-    <div className={`card overflow-hidden ${offering.is_complete ? "ring-1 ring-palm-500/30" : ""}`}>
+    <div 
+      id={`offering-${offering.slug}`}
+      className={`card overflow-hidden ${offering.is_complete ? "ring-1 ring-palm-500/30" : ""}`}
+    >
 {/* Header - clickable to expand/collapse */}
       <button
         ref={headerRef}

@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useCallback, useEffect } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "@/store/useStore";
 import { updateTempleProgress } from "@/lib/api";
@@ -109,6 +109,31 @@ export function AltarDetail() {
     onToggleOffered: (reqId, offered) => handleToggleOffered(reqId, offered),
     enabled: !!altar,
   });
+
+  // Handle openOffering query param (from global search navigation)
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  useEffect(() => {
+    const openOfferingSlug = searchParams.get('openOffering');
+    if (!openOfferingSlug || !altar) return;
+
+    // Find the offering
+    const offeringIndex = altar.offerings.findIndex(o => o.slug === openOfferingSlug);
+    if (offeringIndex !== -1) {
+      // Expand the offering
+      expandOffering(openOfferingSlug);
+      
+      // Scroll to the offering section after a small delay to allow expansion
+      setTimeout(() => {
+        const element = document.getElementById(`offering-${openOfferingSlug}`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      
+      // Clear URL param to avoid re-scrolling on refresh
+      searchParams.delete('openOffering');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, altar, expandOffering]);
 
   if (!currentSaveId) {
     return <NoSaveSlotWarning message="Please select a save slot first" />;
