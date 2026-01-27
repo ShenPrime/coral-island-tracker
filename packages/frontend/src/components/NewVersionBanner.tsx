@@ -42,6 +42,7 @@ export function NewVersionBanner() {
   const handleDismiss = () => {
     setDismissed(true);
     setShowWhatsNew(false);
+    localStorage.removeItem(PENDING_WHATS_NEW_KEY);
   };
 
   // Show "What's new" banner after refresh (with changelog details)
