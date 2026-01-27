@@ -18,7 +18,7 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Configuration
 const WINDOW_MS = 60 * 1000; // 1 minute window
-const MAX_REQUESTS = 100; // 100 requests per minute per session
+const MAX_REQUESTS = 500; // 500 requests per minute per session
 
 // Cleanup old entries every 5 minutes
 setInterval(() => {

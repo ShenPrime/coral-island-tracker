@@ -78,6 +78,10 @@ async function createSession(): Promise<string> {
 
 /**
  * Validate an existing session
+ * 
+ * Only treats HTTP 401 as "invalid session".
+ * Other errors (429 rate limit, 500 server error, network issues) 
+ * are assumed to be temporary - session is kept to prevent data loss.
  */
 async function validateSession(sessionId: string): Promise<boolean> {
   try {
@@ -89,14 +93,24 @@ async function validateSession(sessionId: string): Promise<boolean> {
       },
     });
 
-    if (!response.ok) {
+    // Only 401 means the session is truly invalid
+    if (response.status === 401) {
       return false;
+    }
+
+    // For rate limits (429), server errors (5xx), etc. - assume session is still valid
+    // This prevents losing session/save data due to temporary issues
+    if (!response.ok) {
+      console.warn(`Session validation got ${response.status}, assuming session is still valid`);
+      return true;
     }
 
     const data: SessionResponse = await response.json();
     return data.valid === true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Network errors - assume session is still valid
+    console.warn("Session validation failed due to network error, assuming session is still valid", error);
+    return true;
   }
 }
 

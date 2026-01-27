@@ -111,7 +111,7 @@ console.log(`
   ====================
   Server running at http://localhost:${port}
   Frontend served from: ${frontendDist}
-  Rate limiting: 100 requests/minute per session
+  Rate limiting: 500 requests/minute per session
 `);
 
 export default {

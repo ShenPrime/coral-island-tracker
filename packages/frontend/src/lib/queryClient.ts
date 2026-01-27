@@ -12,7 +12,18 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,   // Don't refetch when tab regains focus
       refetchOnReconnect: false,     // Don't refetch when network reconnects
       refetchOnMount: false,         // Don't refetch when component mounts if data exists
-      retry: 1,                      // Only retry once on failure
+      retry: (failureCount, error) => {
+        // Don't retry on rate limit errors (429) - wait for rate limit to reset
+        if (error instanceof Error && error.message.includes("Too many requests")) {
+          return false;
+        }
+        // Don't retry on auth errors (401) - session is invalid
+        if (error instanceof Error && error.message.includes("Session expired")) {
+          return false;
+        }
+        // Default: retry once for other errors
+        return failureCount < 1;
+      },
     },
   },
 });
