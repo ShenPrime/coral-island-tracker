@@ -13,6 +13,7 @@ import type {
   UpdateNPCProgressRequest,
 } from "@coral-tracker/shared";
 import { getSessionId } from "./session";
+import { PENDING_WHATS_NEW_KEY } from "./constants";
 
 const API_BASE = "/api";
 
@@ -39,6 +40,8 @@ function checkBuildVersion(response: Response): void {
 
   // Subsequent responses - check for mismatch
   if (serverBuildId !== initialBuildId) {
+    // Set flag so "What's New" banner shows after user refreshes
+    localStorage.setItem(PENDING_WHATS_NEW_KEY, "true");
     window.dispatchEvent(new CustomEvent("version-mismatch"));
   }
 }

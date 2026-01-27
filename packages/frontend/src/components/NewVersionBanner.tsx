@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { RefreshCw, X, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { getLatestChangelog } from "@/lib/changelog";
-import { BUILD_ID } from "@/lib/queryClient";
-
-const LAST_SEEN_VERSION_KEY = "coral-tracker-last-version";
+import { PENDING_WHATS_NEW_KEY } from "@/lib/constants";
 
 /**
  * Banner that appears in two scenarios:
@@ -15,7 +13,7 @@ const LAST_SEEN_VERSION_KEY = "coral-tracker-last-version";
  * 2. After refresh: When user has just upgraded, shows "What's new in vX.X.X"
  *    with an expandable changelog. User can see new features and dismiss.
  * 
- * Fixed position to overlay content, z-50 to take priority over offline banner.
+ * Fixed position to overlay content, z-[60] to appear above header (z-50) and offline banner (z-40).
  * Ocean-colored to distinguish from the amber offline warning.
  */
 export function NewVersionBanner() {
@@ -26,34 +24,29 @@ export function NewVersionBanner() {
 
   const changelog = getLatestChangelog();
 
-  // Check if we just upgraded (show "what's new" after refresh)
+  // Check if we have a pending "What's New" notification from before refresh
   useEffect(() => {
-    // Skip in development
-    if (BUILD_ID === "dev") return;
-
-    const lastVersion = localStorage.getItem(LAST_SEEN_VERSION_KEY);
-    
-    // If we have a stored version and it's different from current, user just upgraded
-    if (lastVersion && lastVersion !== BUILD_ID) {
+    const pendingWhatsNew = localStorage.getItem(PENDING_WHATS_NEW_KEY);
+    if (pendingWhatsNew) {
       setShowWhatsNew(true);
+      // Note: Flag is removed when user dismisses, not here
+      // This handles React Strict Mode double-mounting
     }
-    
-    // Always update to current version
-    localStorage.setItem(LAST_SEEN_VERSION_KEY, BUILD_ID);
-  }, []);
+  }, [changelog]);
 
   const handleDismiss = () => {
+    localStorage.removeItem(PENDING_WHATS_NEW_KEY);
     setDismissed(true);
     setShowWhatsNew(false);
   };
 
-  // Show "What's new" banner after refresh
+  // Show "What's new" banner after refresh (with changelog details)
   if (showWhatsNew && !dismissed && changelog) {
     return (
       <div
         role="alert"
         aria-live="polite"
-        className="fixed top-0 left-0 right-0 z-50 bg-ocean-600 text-white shadow-lg"
+        className="fixed top-0 left-0 right-0 z-[60] bg-ocean-600 text-white shadow-lg"
       >
         {/* Main banner row */}
         <div className="px-4 py-2 flex items-center justify-center gap-2 flex-wrap">
@@ -95,13 +88,33 @@ export function NewVersionBanner() {
     );
   }
 
+  // Show "What's new" banner after refresh (fallback when changelog parsing fails)
+  if (showWhatsNew && !dismissed && !changelog) {
+    return (
+      <div
+        role="alert"
+        aria-live="polite"
+        className="fixed top-0 left-0 right-0 z-[60] bg-ocean-600 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2"
+      >
+        <Sparkles size={16} aria-hidden="true" className="text-palm-300" />
+        <span>New version loaded!</span>
+        <button
+          onClick={handleDismiss}
+          className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+        >
+          Got it
+        </button>
+      </div>
+    );
+  }
+
   // Show "New version available" banner before refresh (existing behavior)
   if (hasNewVersion && !dismissed) {
     return (
       <div
         role="alert"
         aria-live="polite"
-        className="fixed top-0 left-0 right-0 z-50 bg-ocean-600 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2"
+        className="fixed top-0 left-0 right-0 z-[60] bg-ocean-600 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2"
       >
         <RefreshCw size={16} aria-hidden="true" />
         <span>A new version is available</span>

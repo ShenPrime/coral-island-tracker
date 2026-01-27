@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Filter Enhancements**: Dynamic utensil filter for cooking category
 - **Insects**: Added location filter with 16 spawn areas from the wiki
 - **What's New Banner**: Shows changelog after updates so users know what's new
+- **Fix**: What's New banner now properly shows after refresh using pending flag
 
 ## v0.4.0
 - **Accessibility**: Comprehensive keyboard navigation system
