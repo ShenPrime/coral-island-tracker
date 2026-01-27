@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys, type ItemWithProgress, type NPCData } from "./useQueries";
 import { useStore } from "@/store/useStore";
@@ -91,6 +91,82 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
 };
 
 /**
+ * Build searchable items from React Query cache.
+ * Called on each search to ensure fresh data.
+ */
+function buildSearchableItems(
+  queryClient: ReturnType<typeof useQueryClient>,
+  currentSaveId: number
+): SearchableItem[] {
+  const items: SearchableItem[] = [];
+
+  // Add items from each category
+  for (const slug of ITEM_CATEGORY_SLUGS) {
+    const cachedData = queryClient.getQueryData<ItemWithProgress[]>(
+      queryKeys.progress(currentSaveId, slug)
+    );
+
+    if (cachedData) {
+      for (const item of cachedData) {
+        items.push({
+          id: item.id,
+          name: item.name,
+          type: "item",
+          category: CATEGORY_DISPLAY_NAMES[slug] || slug,
+          categorySlug: slug,
+          imageUrl: item.image_url,
+        });
+      }
+    }
+  }
+
+  // Add NPCs
+  const npcsData = queryClient.getQueryData<NPCData[]>(
+    queryKeys.npcs(currentSaveId)
+  );
+
+  if (npcsData) {
+    for (const npc of npcsData) {
+      items.push({
+        id: npc.id,
+        name: npc.name,
+        type: "npc",
+        category: "NPCs",
+        categorySlug: "npcs",
+        imageUrl: npc.image_url,
+      });
+    }
+  }
+
+  // Add altars
+  for (const altar of LAKE_TEMPLE_ALTARS) {
+    items.push({
+      id: altar,
+      name: altar,
+      type: "altar",
+      category: "Temple",
+      categorySlug: ALTAR_SLUG_MAP[altar] || altar.toLowerCase().replace(" ", "-"),
+      imageUrl: null,
+    });
+  }
+
+  // Add altar offerings (sections within altars)
+  for (const offering of ALTAR_OFFERINGS) {
+    items.push({
+      id: offering.slug,
+      name: offering.name,
+      type: "offering",
+      category: offering.altarName,
+      categorySlug: offering.slug,
+      imageUrl: null,
+      parentSlug: offering.altarSlug,
+    });
+  }
+
+  return items;
+}
+
+/**
  * Hook for global search functionality.
  * Aggregates all searchable data from the React Query cache.
  */
@@ -98,93 +174,29 @@ export function useGlobalSearch() {
   const queryClient = useQueryClient();
   const { currentSaveId } = useStore();
 
-  // Build the searchable index from cached data
-  const searchableItems = useMemo(() => {
-    if (!currentSaveId) return [];
-
-    const items: SearchableItem[] = [];
-
-    // Add items from each category
-    for (const slug of ITEM_CATEGORY_SLUGS) {
-      const cachedData = queryClient.getQueryData<ItemWithProgress[]>(
-        queryKeys.progress(currentSaveId, slug)
-      );
-
-      if (cachedData) {
-        for (const item of cachedData) {
-          items.push({
-            id: item.id,
-            name: item.name,
-            type: "item",
-            category: CATEGORY_DISPLAY_NAMES[slug] || slug,
-            categorySlug: slug,
-            imageUrl: item.image_url,
-          });
-        }
-      }
-    }
-
-    // Add NPCs
-    const npcsData = queryClient.getQueryData<NPCData[]>(
-      queryKeys.npcs(currentSaveId)
-    );
-
-    if (npcsData) {
-      for (const npc of npcsData) {
-        items.push({
-          id: npc.id,
-          name: npc.name,
-          type: "npc",
-          category: "NPCs",
-          categorySlug: "npcs",
-          imageUrl: npc.image_url,
-        });
-      }
-    }
-
-    // Add altars
-    for (const altar of LAKE_TEMPLE_ALTARS) {
-      items.push({
-        id: altar,
-        name: altar,
-        type: "altar",
-        category: "Temple",
-        categorySlug: ALTAR_SLUG_MAP[altar] || altar.toLowerCase().replace(" ", "-"),
-        imageUrl: null,
-      });
-    }
-
-    // Add altar offerings (sections within altars)
-    for (const offering of ALTAR_OFFERINGS) {
-      items.push({
-        id: offering.slug,
-        name: offering.name,
-        type: "offering",
-        category: offering.altarName,
-        categorySlug: offering.slug,
-        imageUrl: null,
-        parentSlug: offering.altarSlug,
-      });
-    }
-
-    return items;
-  }, [currentSaveId, queryClient]);
-
-  // Search function
+  // Search function - builds fresh index on each search to capture latest cache data
   const search = useCallback(
     (query: string): SearchableItem[] => {
-      if (!query.trim()) return [];
+      if (!query.trim() || !currentSaveId) return [];
 
+      const searchableItems = buildSearchableItems(queryClient, currentSaveId);
       const q = query.toLowerCase();
+      
       return searchableItems
         .filter((item) => item.name.toLowerCase().includes(q))
         .slice(0, 12); // Limit results
     },
-    [searchableItems]
+    [currentSaveId, queryClient]
   );
 
-  // Check if data is loaded
-  const isLoading = searchableItems.length === 0 && currentSaveId !== null;
+  // Check if data is available (for loading state)
+  const hasData = useCallback(() => {
+    if (!currentSaveId) return false;
+    // Check if at least one category has data
+    return ITEM_CATEGORY_SLUGS.some(
+      (slug) => queryClient.getQueryData(queryKeys.progress(currentSaveId, slug)) != null
+    );
+  }, [currentSaveId, queryClient]);
 
-  return { search, searchableItems, isLoading };
+  return { search, isLoading: !hasData() };
 }
