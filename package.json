@@ -1,6 +1,6 @@
 {
   "name": "coral-island-tracker",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
@@ -15,7 +15,10 @@
     "db:migrate": "bun run packages/backend/src/db/migrations/001_add_forageables.ts",
     "db:migrate:temple": "bun run packages/backend/src/db/migrations/002_add_lake_temple.ts",
     "db:migrate:temple-redesign": "bun run packages/backend/src/db/migrations/003_temple_redesign.ts",
-    "scrape": "bun run scripts/scrape-wiki.ts"
+    "scrape": "bun run scripts/scrape-wiki.ts",
+    "version:patch": "bun run scripts/bump-version.ts patch",
+    "version:minor": "bun run scripts/bump-version.ts minor",
+    "version:major": "bun run scripts/bump-version.ts major"
   },
   "dependencies": {
     "postgres": "^3.4.0"

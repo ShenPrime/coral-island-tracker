@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## v0.5.0 (Current)
+## v0.5.1 (2026-01-27)
+- **Fix**: Session no longer invalidated when rate limited (429 errors)
+  - Previously, hitting rate limit could cause session loss and 404 errors
+  - Now only HTTP 401 is treated as invalid session
+- **Fix**: React Query no longer retries on rate limit (429) or auth (401) errors
+- **Change**: Increased rate limit from 100 to 500 requests per minute
+- **Feature**: Added semantic versioning with version display in sidebar
+  - Version number links to CHANGELOG on GitHub
+  - Added `bun run version:patch/minor/major` scripts for version bumps
+
+## v0.5.0
 - **Global Search**: Quick search across all items, NPCs, altars, and temple offerings with `Ctrl+K` / `Cmd+K`
   - Autocomplete results with category badges
   - Keyboard navigation (arrow keys, Enter to select)

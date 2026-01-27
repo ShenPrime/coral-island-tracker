@@ -265,8 +265,8 @@ return (
         `}
       >
         <div className={`h-full overflow-y-auto overflow-x-hidden ${sidebarCollapsed ? "p-2" : "p-6"}`}>
-          {/* Logo */}
-          <Link to="/" className={`flex items-center mb-6 ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
+{/* Logo */}
+          <Link to="/" className={`flex items-center ${sidebarCollapsed ? "justify-center mb-6" : "gap-3 mb-2"}`}>
             <div className={`bg-gradient-to-br from-coral-400 to-coral-600 rounded-xl flex items-center justify-center shadow-lg shadow-coral-500/30 flex-shrink-0 ${sidebarCollapsed ? "w-10 h-10" : "w-10 h-10"}`}>
               <Fish className="text-white" size={24} />
             </div>
@@ -277,6 +277,18 @@ return (
               </div>
             )}
           </Link>
+
+          {/* Version - hidden when collapsed */}
+          {!sidebarCollapsed && (
+            <a
+              href="https://github.com/ShenPrime/coral-island-tracker/blob/main/CHANGELOG.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-[10px] text-ocean-500 hover:text-ocean-300 transition-colors mb-4 ml-[52px]"
+            >
+              v{import.meta.env.VITE_APP_VERSION}
+            </a>
+          )}
 
           {/* Global Search Button */}
           <Tooltip content="Search (Ctrl+K)" enabled={sidebarCollapsed}>
