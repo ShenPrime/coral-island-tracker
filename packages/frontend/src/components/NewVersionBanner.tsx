@@ -34,8 +34,12 @@ export function NewVersionBanner() {
     }
   }, [changelog]);
 
-  const handleDismiss = () => {
+  const handleRefresh = () => {
     localStorage.removeItem(PENDING_WHATS_NEW_KEY);
+    window.location.reload();
+  };
+
+  const handleDismiss = () => {
     setDismissed(true);
     setShowWhatsNew(false);
   };
@@ -64,10 +68,10 @@ export function NewVersionBanner() {
             )}
           </button>
           <button
-            onClick={handleDismiss}
+            onClick={handleRefresh}
             className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
           >
-            Got it
+            Refresh
           </button>
         </div>
 
@@ -99,10 +103,10 @@ export function NewVersionBanner() {
         <Sparkles size={16} aria-hidden="true" className="text-palm-300" />
         <span>New version loaded!</span>
         <button
-          onClick={handleDismiss}
+          onClick={handleRefresh}
           className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
         >
-          Got it
+          Refresh
         </button>
       </div>
     );
