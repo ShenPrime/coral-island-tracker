@@ -390,6 +390,7 @@ Contributions are welcome! Here's how to get started:
   - Filters: Utensil, Buff Type, Recipe Source, Energy Gain
 - **Modal Improvements**: Cooking modal shows relevant info only (hides seasons/time)
 - **Filter Enhancements**: Dynamic utensil filter for cooking category
+- **Insects**: Added location filter with 16 spawn areas from the wiki
 
 ### v0.4.0
 - **Accessibility**: Comprehensive keyboard navigation system

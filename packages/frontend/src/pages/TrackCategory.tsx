@@ -13,7 +13,8 @@ import { useGridNavigation } from "@/hooks/useGridNavigation";
 import { useWindowWidth } from "@react-hook/window-size";
 import { 
   FISHING_LOCATIONS, 
-  FORAGING_LOCATIONS, 
+  FORAGING_LOCATIONS,
+  INSECT_LOCATIONS,
   RARITIES,
   SEASONS,
   CHARACTER_TYPES,
@@ -291,6 +292,7 @@ export function TrackCategory() {
   const availableLocations = 
     slug === "fish" ? [...FISHING_LOCATIONS] : 
     slug === "forageables" ? [...FORAGING_LOCATIONS] : 
+    slug === "insects" ? [...INSECT_LOCATIONS] :
     [];
 
   // Get available rarities from items in this category (in standard order)

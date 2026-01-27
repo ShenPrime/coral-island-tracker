@@ -89,6 +89,27 @@ export const FORAGING_LOCATIONS = [
 
 export type ForagingLocation = (typeof FORAGING_LOCATIONS)[number];
 
+export const INSECT_LOCATIONS = [
+  "Beach",
+  "Deep Forest",
+  "Forest",
+  "Forest (Farm)",
+  "Forest (Higher)",
+  "Forest (Lower)",
+  "Forest (Mid)",
+  "Garden Lane",
+  "Hot Spring",
+  "Lake",
+  "Lookout",
+  "Recycling Center",
+  "Savannah",
+  "Town",
+  "Vineyard",
+  "Woodlands",
+] as const;
+
+export type InsectLocation = (typeof INSECT_LOCATIONS)[number];
+
 export const LAKE_TEMPLE_ALTARS = [
   "Crop Altar",
   "Catch Altar",
@@ -330,7 +351,7 @@ export interface CategoryFilterConfig {
 
 export const CATEGORY_FILTER_CONFIG: Record<string, CategoryFilterConfig> = {
   fish:               { showSeasons: true,  showTime: true,  showLocation: true,  showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
-  insects:            { showSeasons: true,  showTime: true,  showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
+  insects:            { showSeasons: true,  showTime: true,  showLocation: true,  showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
   critters:           { showSeasons: true,  showTime: true,  showLocation: false, showRarity: true,  showEquipment: false, showGrowthTime: false, showPriceSort: true },
   crops:              { showSeasons: true,  showTime: false, showLocation: false, showRarity: false, showEquipment: false, showGrowthTime: true,  showPriceSort: true },
   "artisan-products": { showSeasons: true,  showTime: false, showLocation: false, showRarity: false, showEquipment: true,  showGrowthTime: false, showPriceSort: true },
