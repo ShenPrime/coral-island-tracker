@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Modal Improvements**: Cooking modal shows relevant info only (hides seasons/time)
 - **Filter Enhancements**: Dynamic utensil filter for cooking category
 - **Insects**: Added location filter with 16 spawn areas from the wiki
+- **What's New Banner**: Shows changelog after updates so users know what's new
 
 ## v0.4.0
 - **Accessibility**: Comprehensive keyboard navigation system
