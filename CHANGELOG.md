@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.2 (2026-01-28)
+- **Fix**: Cross-view cache sync — toggling item completion or temple offerings now instantly updates all views (Dashboard, Category, Temple, Altar) without network refetches
+  - Category → Dashboard: completion stats update optimistically
+  - Category ↔ Altar: temple offering toggles sync bidirectionally
+  - Category/Altar → Temple Overview: offered item counts update optimistically
+- **Feature**: Improved search with relevance scoring and fuzzy matching
+  - Results ranked by: exact match → starts with → word boundary → substring → fuzzy
+  - Applied to both global search (Ctrl+K) and category search
+- **Fix**: Global search only activates when all category data is cached
+- **Change**: Dev server now binds to `0.0.0.0` for network access
+
 ## v0.5.1 (2026-01-27)
 - **Fix**: Session no longer invalidated when rate limited (429 errors)
   - Previously, hitting rate limit could cause session loss and 404 errors

@@ -9,13 +9,14 @@ import {
   incrementNPCHearts,
   decrementNPCHearts,
 } from "@/lib/api";
-import { queryKeys, type ItemWithProgress, type NPCData } from "./useQueries";
+import { queryKeys, type ItemWithProgress, type NPCData, type SaveSlotWithStats } from "./useQueries";
 import type {
   UpdateProgressRequest,
   CreateSaveSlotRequest,
   SaveSlot,
   ItemTempleStatus,
   RelationshipStatus,
+  AltarWithOfferings,
 } from "@coral-tracker/shared";
 
 // ============================================================
@@ -68,21 +69,52 @@ export function useUpdateProgress() {
           )
       );
 
-      // Return context with snapshot for rollback
-      return { previousItems };
+      // Optimistically update dashboard stats
+      const previousSaveSlot = queryClient.getQueryData<SaveSlotWithStats>(
+        queryKeys.saveSlot(saveId)
+      );
+
+      if (data.completed !== undefined) {
+        const delta = data.completed ? 1 : -1;
+        queryClient.setQueryData<SaveSlotWithStats>(
+          queryKeys.saveSlot(saveId),
+          (old) => {
+            if (!old) return old;
+            const newCompleted = old.stats.completed_items + delta;
+            return {
+              ...old,
+              stats: {
+                ...old.stats,
+                completed_items: newCompleted,
+                completion_percentage: Math.round((newCompleted / old.stats.total_items) * 100),
+                by_category: old.stats.by_category.map((cat) =>
+                  cat.category_slug === category
+                    ? { ...cat, completed: cat.completed + delta }
+                    : cat
+                ),
+              },
+            };
+          }
+        );
+      }
+
+      return { previousItems, previousSaveSlot };
     },
 
     onError: (_err, { saveId, category }, context) => {
-      // Rollback to previous value on error
       if (context?.previousItems) {
         queryClient.setQueryData(
           queryKeys.progress(saveId, category),
           context.previousItems
         );
       }
+      if (context?.previousSaveSlot) {
+        queryClient.setQueryData(
+          queryKeys.saveSlot(saveId),
+          context.previousSaveSlot
+        );
+      }
     },
-
-    // No onSettled invalidation - we trust our optimistic update
   });
 }
 
@@ -223,7 +255,48 @@ export function useUpdateTempleProgress() {
         }
       );
 
-      return { previousStatus };
+      // Optimistically update temple overview counts
+      const previousTempleOverview = queryClient.getQueryData(
+        queryKeys.templeOverview(saveId)
+      );
+      const delta = offered ? 1 : -1;
+      queryClient.setQueryData(queryKeys.templeOverview(saveId), (prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          offered_items: prev.offered_items + delta,
+        };
+      });
+
+      // Optimistically update all cached altar details matching this requirement
+      queryClient.setQueriesData<AltarWithOfferings>(
+        { queryKey: ["altar", saveId] },
+        (old) => {
+          if (!old) return old;
+          const updatedOfferings = old.offerings.map((offering) => {
+            const updatedItems = offering.items.map((item) =>
+              item.id === requirementId
+                ? { ...item, offered, offered_at: offered ? new Date() : null }
+                : item
+            );
+            const offeredCount = updatedItems.filter((i) => i.offered).length;
+            return {
+              ...offering,
+              items: updatedItems,
+              offered_items: offeredCount,
+              is_complete: offeredCount === offering.total_items,
+            };
+          });
+          return {
+            ...old,
+            offerings: updatedOfferings,
+            offered_items: updatedOfferings.reduce((sum, o) => sum + o.offered_items, 0),
+            completed_offerings: updatedOfferings.filter((o) => o.is_complete).length,
+          };
+        }
+      );
+
+      return { previousStatus, previousTempleOverview };
     },
 
     onError: (_err, { saveId, category }, context) => {
@@ -233,13 +306,12 @@ export function useUpdateTempleProgress() {
           context.previousStatus
         );
       }
-    },
-
-    onSettled: (_data, _err, { saveId }) => {
-      // Also invalidate temple overview since counts may have changed
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.templeOverview(saveId),
-      });
+      if (context?.previousTempleOverview) {
+        queryClient.setQueryData(
+          queryKeys.templeOverview(saveId),
+          context.previousTempleOverview
+        );
+      }
     },
   });
 }

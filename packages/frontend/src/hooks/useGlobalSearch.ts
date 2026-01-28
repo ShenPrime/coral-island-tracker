@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys, type ItemWithProgress, type NPCData } from "./useQueries";
 import { useStore } from "@/store/useStore";
 import { LAKE_TEMPLE_ALTARS } from "@coral-tracker/shared";
+import { searchAndSort } from "@/lib/search";
 
 /**
  * Represents a searchable item in the global search
@@ -182,8 +183,7 @@ export function useGlobalSearch() {
       const searchableItems = buildSearchableItems(queryClient, currentSaveId);
       const q = query.toLowerCase();
       
-      return searchableItems
-        .filter((item) => item.name.toLowerCase().includes(q))
+      return searchAndSort(searchableItems, q, (item) => item.name)
         .slice(0, 12); // Limit results
     },
     [currentSaveId, queryClient]
@@ -193,7 +193,7 @@ export function useGlobalSearch() {
   const hasData = useCallback(() => {
     if (!currentSaveId) return false;
     // Check if at least one category has data
-    return ITEM_CATEGORY_SLUGS.some(
+    return ITEM_CATEGORY_SLUGS.every(
       (slug) => queryClient.getQueryData(queryKeys.progress(currentSaveId, slug)) != null
     );
   }, [currentSaveId, queryClient]);

@@ -9,7 +9,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, ArrowLeft, Sprout, Fish, Sparkles, Crown } from "lucide-react";
 import { useOfferingNavigation } from "@/hooks/useOfferingNavigation";
-import type { AltarWithOfferings } from "@coral-tracker/shared";
+import type { AltarWithOfferings, ItemTempleStatus } from "@coral-tracker/shared";
 
 const altarIcons: Record<string, React.ReactNode> = {
   "crop-altar": <Sprout size={24} />,
@@ -83,6 +83,27 @@ export function AltarDetail() {
         ),
       };
     });
+
+    // Optimistically update all cached temple-status entries matching this requirement
+    queryClient.setQueriesData<Record<number, ItemTempleStatus>>(
+      { queryKey: ["temple-status", currentSaveId] },
+      (old) => {
+        if (!old) return old;
+        const updated = { ...old };
+        for (const [itemId, status] of Object.entries(updated)) {
+          const matchingReq = status.requirements.find((r) => r.requirement_id === requirementId);
+          if (matchingReq) {
+            updated[Number(itemId)] = {
+              ...status,
+              requirements: status.requirements.map((r) =>
+                r.requirement_id === requirementId ? { ...r, offered } : r
+              ),
+            };
+          }
+        }
+        return updated;
+      }
+    );
 
     try {
       await updateTempleProgress(currentSaveId, requirementId, offered);

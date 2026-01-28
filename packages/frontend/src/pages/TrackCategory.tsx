@@ -26,8 +26,10 @@ import {
 } from "@coral-tracker/shared";
 import type { Rarity, Season, CharacterType, RelationshipStatus, RecipeSource } from "@coral-tracker/shared";
 
+import { scoreMatch } from "@/lib/search";
+
 // Query hooks
-import { 
+import {
   useProgressItems, 
   useNPCs, 
   useCategory, 
@@ -389,7 +391,7 @@ export function TrackCategory() {
 
   const filteredItems = items.filter((item) => {
     // Search filter
-    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+    if (searchQuery && scoreMatch(item.name, searchQuery) === 0) {
       return false;
     }
 
@@ -496,13 +498,20 @@ export function TrackCategory() {
     return true;
   });
 
+  // Sort by search relevance when a search query is active
+  if (searchQuery) {
+    filteredItems.sort(
+      (a, b) => scoreMatch(b.name, searchQuery) - scoreMatch(a.name, searchQuery)
+    );
+  }
+
   // ============================================================
   // Filter NPCs
   // ============================================================
 
   const filteredNPCs = npcs.filter((npc) => {
     // Search filter
-    if (searchQuery && !npc.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+    if (searchQuery && scoreMatch(npc.name, searchQuery) === 0) {
       return false;
     }
 
@@ -545,6 +554,13 @@ export function TrackCategory() {
 
     return true;
   });
+
+  // Sort NPCs by search relevance when a search query is active
+  if (searchQuery) {
+    filteredNPCs.sort(
+      (a, b) => scoreMatch(b.name, searchQuery) - scoreMatch(a.name, searchQuery)
+    );
+  }
 
   // ============================================================
   // Sort items
