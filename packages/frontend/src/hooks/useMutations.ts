@@ -281,7 +281,7 @@ export function useUpdateTempleProgress() {
           const updatedOfferings = old.offerings.map((offering) => {
             const updatedItems = offering.items.map((item) =>
               item.id === requirementId
-                ? { ...item, offered, offered_at: offered ? new Date() : null }
+                ? { ...item, offered, offered_at: offered ? new Date().toISOString() : null }
                 : item
             );
             const offeredCount = updatedItems.filter((i) => i.offered).length;

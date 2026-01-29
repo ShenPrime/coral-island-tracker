@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
 - **Backend**: Wrap multi-statement progress mutations in transactions (progress, NPC, temple routes)
 - **Backend**: Add session cleanup — deletes sessions inactive for 6+ months, runs monthly
 - **Backend**: Graceful shutdown on SIGTERM/SIGINT with connection pool drain
+- **Types**: Fix `Date` → `string` for all API response date fields (SaveSlot, Progress, TempleProgress, NPCProgress, TempleItemWithProgress)
+- **Types**: Add missing `"artisan-products"` to `CATEGORY_SLUGS`
 
 ## v0.5.3 (2026-01-29)
 

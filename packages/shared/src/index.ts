@@ -30,8 +30,8 @@ export interface Item {
 export interface SaveSlot {
   id: number;
   name: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Progress {
@@ -39,7 +39,7 @@ export interface Progress {
   save_slot_id: number;
   item_id: number;
   completed: boolean;
-  completed_at: Date | null;
+  completed_at: string | null;
   notes: string | null;
 }
 
@@ -128,6 +128,7 @@ export const CATEGORY_SLUGS = [
   "gems",
   "forageables",
   "cooking",
+  "artisan-products",
   "npcs",
 ] as const;
 
@@ -243,13 +244,13 @@ export interface TempleProgress {
   save_slot_id: number;
   temple_requirement_id: number;
   offered: boolean;
-  offered_at: Date | null;
+  offered_at: string | null;
 }
 
 // Temple item with progress and linked item details
 export interface TempleItemWithProgress extends TempleRequirement {
   offered: boolean;
-  offered_at: Date | null;
+  offered_at: string | null;
   // Linked item details (if item exists in database)
   linked_item?: Item | null;
 }
@@ -422,8 +423,8 @@ export interface NPCProgress {
   hearts: number;
   relationship_status: RelationshipStatus;
   notes: string | null;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 // NPC item with progress
