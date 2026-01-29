@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.6 (2026-01-30)
+
+- **Fix**: Replace redundant "Refresh" button in What's New banners with dismiss `X` button
+- **Feature**: Add "Full changelog" link to expandable What's New section
+
 ## v0.5.5 (2026-01-30)
 
 - **Refactor**: Extract `SearchAutocomplete`, `MultiSelectDropdown`, and `SingleSelectDropdown` from `FilterBar.tsx` into dedicated component files (900 → 458 lines)

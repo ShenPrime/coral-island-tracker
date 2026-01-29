@@ -34,11 +34,6 @@ export function NewVersionBanner() {
     }
   }, []);
 
-  const handleRefresh = () => {
-    localStorage.removeItem(PENDING_WHATS_NEW_KEY);
-    window.location.reload();
-  };
-
   const handleDismiss = () => {
     setDismissed(true);
     setShowWhatsNew(false);
@@ -69,10 +64,11 @@ export function NewVersionBanner() {
             )}
           </button>
           <button
-            onClick={handleRefresh}
-            className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+            onClick={handleDismiss}
+            className="ml-2 p-1 hover:bg-white/20 rounded transition-colors"
+            aria-label="Dismiss"
           >
-            Refresh
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
@@ -87,6 +83,16 @@ export function NewVersionBanner() {
                 </li>
               ))}
             </ul>
+            <div className="mt-3 text-center">
+              <a
+                href="https://github.com/ShenPrime/coral-island-tracker/blob/main/CHANGELOG.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-palm-300 hover:text-palm-200 underline transition-colors"
+              >
+                Full changelog
+              </a>
+            </div>
           </div>
         )}
       </div>
@@ -104,10 +110,11 @@ export function NewVersionBanner() {
         <Sparkles size={16} aria-hidden="true" className="text-palm-300" />
         <span>New version loaded!</span>
         <button
-          onClick={handleRefresh}
-          className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+          onClick={handleDismiss}
+          className="ml-2 p-1 hover:bg-white/20 rounded transition-colors"
+          aria-label="Dismiss"
         >
-          Refresh
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
     );
