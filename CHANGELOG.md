@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.3 (2026-01-29)
+- **Performance**: Search in category view now scores and sorts items in a single pass instead of double-scoring with separate filter and sort
+- **Performance**: Search regex is precompiled once per query instead of recreated per item
+- **Fix**: Temple offering rollback now restores altar detail and temple-status caches on mutation failure
+- **Refactor**: AltarDetail uses shared `useUpdateTempleProgress` hook instead of duplicating optimistic update logic
+- **Fix**: Temple overview optimistic update now includes per-altar offered counts when toggling from altar view
+- **Fix**: Replaced `any` type in temple overview cache update with proper `TempleOverview` type
+
 ## v0.5.2 (2026-01-28)
 - **Fix**: Cross-view cache sync — toggling item completion or temple offerings now instantly updates all views (Dashboard, Category, Temple, Altar) without network refetches
   - Category → Dashboard: completion stats update optimistically

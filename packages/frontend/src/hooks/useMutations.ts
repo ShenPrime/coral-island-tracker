@@ -17,6 +17,7 @@ import type {
   ItemTempleStatus,
   RelationshipStatus,
   AltarWithOfferings,
+  TempleOverview,
 } from "@coral-tracker/shared";
 
 // ============================================================
@@ -211,6 +212,7 @@ interface UpdateTempleProgressVariables {
   itemId: number;
   category: string;
   offered: boolean;
+  altarSlug?: string;
 }
 
 /**
@@ -223,49 +225,67 @@ export function useUpdateTempleProgress() {
     mutationFn: ({ saveId, requirementId, offered }: UpdateTempleProgressVariables) =>
       updateTempleProgress(saveId, requirementId, offered),
 
-    onMutate: async ({ saveId, category, itemId, requirementId, offered }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({
-        queryKey: queryKeys.templeStatus(saveId, category),
-      });
+    onMutate: async ({ saveId, category, itemId, requirementId, offered, altarSlug }) => {
+      const delta = offered ? 1 : -1;
 
-      // Snapshot previous values
-      const previousStatus = queryClient.getQueryData<Record<number, ItemTempleStatus>>(
-        queryKeys.templeStatus(saveId, category)
-      );
+      // Cancel relevant queries
+      if (category) {
+        await queryClient.cancelQueries({
+          queryKey: queryKeys.templeStatus(saveId, category),
+        });
+      }
 
-      // Optimistically update the temple status for this item
-      queryClient.setQueryData<Record<number, ItemTempleStatus>>(
-        queryKeys.templeStatus(saveId, category),
-        (old) => {
-          if (!old || !old[itemId]) return old;
+      // Snapshot temple status (category path)
+      const previousStatus = category
+        ? queryClient.getQueryData<Record<number, ItemTempleStatus>>(
+            queryKeys.templeStatus(saveId, category)
+          )
+        : undefined;
 
-          const itemStatus = old[itemId];
-          return {
-            ...old,
-            [itemId]: {
-              ...itemStatus,
-              requirements: itemStatus.requirements.map((req) =>
-                req.requirement_id === requirementId
-                  ? { ...req, offered }
-                  : req
-              ),
-            },
-          };
-        }
-      );
+      if (category) {
+        queryClient.setQueryData<Record<number, ItemTempleStatus>>(
+          queryKeys.templeStatus(saveId, category),
+          (old) => {
+            if (!old || !old[itemId]) return old;
+            const itemStatus = old[itemId];
+            return {
+              ...old,
+              [itemId]: {
+                ...itemStatus,
+                requirements: itemStatus.requirements.map((req) =>
+                  req.requirement_id === requirementId
+                    ? { ...req, offered }
+                    : req
+                ),
+              },
+            };
+          }
+        );
+      }
 
-      // Optimistically update temple overview counts
-      const previousTempleOverview = queryClient.getQueryData(
+      // Snapshot temple overview
+      const previousTempleOverview = queryClient.getQueryData<TempleOverview>(
         queryKeys.templeOverview(saveId)
       );
-      const delta = offered ? 1 : -1;
-      queryClient.setQueryData(queryKeys.templeOverview(saveId), (prev: any) => {
+
+      queryClient.setQueryData<TempleOverview>(queryKeys.templeOverview(saveId), (prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           offered_items: prev.offered_items + delta,
+          altars: altarSlug
+            ? prev.altars.map((a) =>
+                a.slug === altarSlug
+                  ? { ...a, offered_items: a.offered_items + delta }
+                  : a
+              )
+            : prev.altars,
         };
+      });
+
+      // Snapshot all altar detail caches
+      const previousAltarData = queryClient.getQueriesData<AltarWithOfferings>({
+        queryKey: ["altar", saveId],
       });
 
       // Optimistically update all cached altar details matching this requirement
@@ -296,11 +316,40 @@ export function useUpdateTempleProgress() {
         }
       );
 
-      return { previousStatus, previousTempleOverview };
+      // Snapshot and update temple-status caches (AltarDetail path)
+      const previousTempleStatuses = altarSlug
+        ? queryClient.getQueriesData<Record<number, ItemTempleStatus>>({
+            queryKey: ["temple-status", saveId],
+          })
+        : undefined;
+
+      if (altarSlug) {
+        queryClient.setQueriesData<Record<number, ItemTempleStatus>>(
+          { queryKey: ["temple-status", saveId] },
+          (old) => {
+            if (!old) return old;
+            const updated = { ...old };
+            for (const [id, status] of Object.entries(updated)) {
+              const matchingReq = status.requirements.find((r) => r.requirement_id === requirementId);
+              if (matchingReq) {
+                updated[Number(id)] = {
+                  ...status,
+                  requirements: status.requirements.map((r) =>
+                    r.requirement_id === requirementId ? { ...r, offered } : r
+                  ),
+                };
+              }
+            }
+            return updated;
+          }
+        );
+      }
+
+      return { previousStatus, previousTempleOverview, previousAltarData, previousTempleStatuses };
     },
 
     onError: (_err, { saveId, category }, context) => {
-      if (context?.previousStatus) {
+      if (context?.previousStatus && category) {
         queryClient.setQueryData(
           queryKeys.templeStatus(saveId, category),
           context.previousStatus
@@ -311,6 +360,16 @@ export function useUpdateTempleProgress() {
           queryKeys.templeOverview(saveId),
           context.previousTempleOverview
         );
+      }
+      if (context?.previousAltarData) {
+        context.previousAltarData.forEach(([key, data]) => {
+          if (data) queryClient.setQueryData(key, data);
+        });
+      }
+      if (context?.previousTempleStatuses) {
+        context.previousTempleStatuses.forEach(([key, data]) => {
+          if (data) queryClient.setQueryData(key, data);
+        });
       }
     },
   });

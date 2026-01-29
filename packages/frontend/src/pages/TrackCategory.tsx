@@ -26,7 +26,7 @@ import {
 } from "@coral-tracker/shared";
 import type { Rarity, Season, CharacterType, RelationshipStatus, RecipeSource } from "@coral-tracker/shared";
 
-import { scoreMatch } from "@/lib/search";
+import { searchAndSort } from "@/lib/search";
 
 // Query hooks
 import {
@@ -389,12 +389,9 @@ export function TrackCategory() {
   // Filter items
   // ============================================================
 
-  const filteredItems = items.filter((item) => {
-    // Search filter
-    if (searchQuery && scoreMatch(item.name, searchQuery) === 0) {
-      return false;
-    }
+  const searchFilteredItems = searchQuery ? searchAndSort(items, searchQuery, (i) => i.name) : items;
 
+  const filteredItems = searchFilteredItems.filter((item) => {
     // Season filter (match ANY selected season, or if item has no seasons it's "any season")
     if (selectedSeasons.length > 0) {
       const itemSeasons = item.seasons || [];
@@ -498,23 +495,13 @@ export function TrackCategory() {
     return true;
   });
 
-  // Sort by search relevance when a search query is active
-  if (searchQuery) {
-    filteredItems.sort(
-      (a, b) => scoreMatch(b.name, searchQuery) - scoreMatch(a.name, searchQuery)
-    );
-  }
-
   // ============================================================
   // Filter NPCs
   // ============================================================
 
-  const filteredNPCs = npcs.filter((npc) => {
-    // Search filter
-    if (searchQuery && scoreMatch(npc.name, searchQuery) === 0) {
-      return false;
-    }
+  const searchFilteredNPCs = searchQuery ? searchAndSort(npcs, searchQuery, (n) => n.name) : npcs;
 
+  const filteredNPCs = searchFilteredNPCs.filter((npc) => {
     // Birthday season filter
     if (selectedBirthdaySeason) {
       const birthdaySeason = npc.metadata?.birthday_season;
@@ -554,13 +541,6 @@ export function TrackCategory() {
 
     return true;
   });
-
-  // Sort NPCs by search relevance when a search query is active
-  if (searchQuery) {
-    filteredNPCs.sort(
-      (a, b) => scoreMatch(b.name, searchQuery) - scoreMatch(a.name, searchQuery)
-    );
-  }
 
   // ============================================================
   // Sort items

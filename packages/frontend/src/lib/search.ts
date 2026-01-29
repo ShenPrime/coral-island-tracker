@@ -40,6 +40,21 @@ export function scoreMatch(name: string, query: string): number {
   return 0;
 }
 
+function createMatcher(query: string): (name: string) => number {
+  const queryLower = query.toLowerCase();
+  const wordBoundaryRegex = new RegExp(`[\\s\\-]${escapeRegex(queryLower)}`);
+
+  return (name: string): number => {
+    const nameLower = name.toLowerCase();
+    if (nameLower === queryLower) return 100;
+    if (nameLower.startsWith(queryLower)) return 80;
+    if (wordBoundaryRegex.test(nameLower)) return 60;
+    if (nameLower.includes(queryLower)) return 40;
+    if (fuzzyMatch(nameLower, queryLower)) return 20;
+    return 0;
+  };
+}
+
 /** Filter and sort items by search relevance. Returns items unchanged when query is empty. */
 export function searchAndSort<T>(
   items: T[],
@@ -47,8 +62,9 @@ export function searchAndSort<T>(
   getName: (item: T) => string
 ): T[] {
   if (!query.trim()) return items;
+  const score = createMatcher(query);
   return items
-    .map((item) => ({ item, score: scoreMatch(getName(item), query) }))
+    .map((item) => ({ item, score: score(getName(item)) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
     .map(({ item }) => item);

@@ -1,15 +1,13 @@
 import { useCallback, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "@/store/useStore";
-import { updateTempleProgress } from "@/lib/api";
-import { useAltarDetail, queryKeys } from "@/hooks/useQueries";
+import { useAltarDetail } from "@/hooks/useQueries";
+import { useUpdateTempleProgress } from "@/hooks/useMutations";
 import { OfferingSection } from "@/components/OfferingSection";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { AlertCircle, ArrowLeft, Sprout, Fish, Sparkles, Crown } from "lucide-react";
 import { useOfferingNavigation } from "@/hooks/useOfferingNavigation";
-import type { AltarWithOfferings, ItemTempleStatus } from "@coral-tracker/shared";
 
 const altarIcons: Record<string, React.ReactNode> = {
   "crop-altar": <Sprout size={24} />,
@@ -28,92 +26,24 @@ const altarColors: Record<string, string> = {
 export function AltarDetail() {
   const { altarSlug } = useParams<{ altarSlug: string }>();
   const { currentSaveId } = useStore();
-  const queryClient = useQueryClient();
 
   // Use React Query for caching
   const { data: altar, isLoading, error } = useAltarDetail(currentSaveId, altarSlug);
 
-  const handleToggleOffered = useCallback(async (requirementId: number, offered: boolean) => {
-    if (!currentSaveId || !altarSlug || !altar) return;
+  const updateTempleMutation = useUpdateTempleProgress();
 
-    // Optimistic update - directly update the cache
-    const queryKey = queryKeys.altarDetail(currentSaveId, altarSlug);
-    
-    queryClient.setQueryData<AltarWithOfferings>(queryKey, (prev) => {
-      if (!prev) return prev;
-      
-      const updatedOfferings = prev.offerings.map((offering) => {
-        const updatedItems = offering.items.map((item) =>
-          item.id === requirementId
-            ? { ...item, offered, offered_at: offered ? new Date() : null }
-            : item
-        );
-        
-        const offeredCount = updatedItems.filter((i) => i.offered).length;
-        
-        return {
-          ...offering,
-          items: updatedItems,
-          offered_items: offeredCount,
-          is_complete: offeredCount === offering.total_items,
-        };
-      });
+  const handleToggleOffered = useCallback((requirementId: number, offered: boolean) => {
+    if (!currentSaveId || !altarSlug) return;
 
-      return {
-        ...prev,
-        offerings: updatedOfferings,
-        offered_items: updatedOfferings.reduce((sum, o) => sum + o.offered_items, 0),
-        completed_offerings: updatedOfferings.filter((o) => o.is_complete).length,
-      };
+    updateTempleMutation.mutate({
+      saveId: currentSaveId,
+      requirementId,
+      itemId: 0,
+      category: "",
+      offered,
+      altarSlug,
     });
-
-    // Also update the temple overview cache to keep counts in sync
-    const overviewKey = queryKeys.templeOverview(currentSaveId);
-    queryClient.setQueryData(overviewKey, (prev: any) => {
-      if (!prev) return prev;
-      
-      const delta = offered ? 1 : -1;
-      return {
-        ...prev,
-        offered_items: prev.offered_items + delta,
-        altars: prev.altars.map((a: any) => 
-          a.slug === altarSlug 
-            ? { ...a, offered_items: a.offered_items + delta }
-            : a
-        ),
-      };
-    });
-
-    // Optimistically update all cached temple-status entries matching this requirement
-    queryClient.setQueriesData<Record<number, ItemTempleStatus>>(
-      { queryKey: ["temple-status", currentSaveId] },
-      (old) => {
-        if (!old) return old;
-        const updated = { ...old };
-        for (const [itemId, status] of Object.entries(updated)) {
-          const matchingReq = status.requirements.find((r) => r.requirement_id === requirementId);
-          if (matchingReq) {
-            updated[Number(itemId)] = {
-              ...status,
-              requirements: status.requirements.map((r) =>
-                r.requirement_id === requirementId ? { ...r, offered } : r
-              ),
-            };
-          }
-        }
-        return updated;
-      }
-    );
-
-    try {
-      await updateTempleProgress(currentSaveId, requirementId, offered);
-    } catch (err) {
-      console.error("Failed to update progress:", err);
-      // Revert on error by invalidating the cache (will use stale data until manual refresh)
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.invalidateQueries({ queryKey: overviewKey });
-    }
-  }, [currentSaveId, altarSlug, altar, queryClient]);
+  }, [currentSaveId, altarSlug, updateTempleMutation]);
 
   // Keyboard navigation for offerings and items
   const {
