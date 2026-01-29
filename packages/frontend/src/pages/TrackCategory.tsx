@@ -27,6 +27,7 @@ import {
 import type { Rarity, Season, CharacterType, RelationshipStatus, RecipeSource } from "@coral-tracker/shared";
 
 import { searchAndSort } from "@/lib/search";
+import { parseMetadata } from "@/lib/parseMetadata";
 
 // Query hooks
 import {
@@ -63,19 +64,6 @@ const CARD_HEIGHTS: Record<string, number> = {
 };
 
 const DEFAULT_CARD_HEIGHT = 220;
-
-// Helper to parse metadata (handles string or object)
-function parseMetadata(metadata: unknown): Record<string, unknown> {
-  if (!metadata) return {};
-  if (typeof metadata === 'string') {
-    try {
-      return JSON.parse(metadata);
-    } catch {
-      return {};
-    }
-  }
-  return metadata as Record<string, unknown>;
-}
 
 export function TrackCategory() {
   const { slug } = useParams<{ slug: string }>();

@@ -1,63 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  Fish,
-  Bug,
-  Rabbit,
-  Carrot,
-  Scroll,
-  Gem,
-  Leaf,
-  UtensilsCrossed,
-  Users,
-  Landmark,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { useGlobalSearch, type SearchableItem } from "@/hooks/useGlobalSearch";
+import { HighlightMatch } from "@/lib/highlightMatch";
+import { CATEGORY_ICON_COMPONENTS, TEMPLE_ICON_COMPONENT } from "@/lib/icons";
 
-// Category icons for search results
-const categoryIcons: Record<string, React.ReactNode> = {
-  fish: <Fish size={18} className="text-ocean-400" />,
-  insects: <Bug size={18} className="text-palm-400" />,
-  critters: <Rabbit size={18} className="text-coral-400" />,
-  crops: <Carrot size={18} className="text-orange-400" />,
-  artifacts: <Scroll size={18} className="text-amber-400" />,
-  gems: <Gem size={18} className="text-purple-400" />,
-  forageables: <Leaf size={18} className="text-green-400" />,
-  cooking: <UtensilsCrossed size={18} className="text-red-400" />,
-  "artisan-products": <UtensilsCrossed size={18} className="text-amber-400" />,
-  npcs: <Users size={18} className="text-pink-400" />,
-  temple: <Landmark size={18} className="text-cyan-400" />,
+const SEARCH_ICON_COLORS: Record<string, string> = {
+  fish: "text-ocean-400",
+  insects: "text-palm-400",
+  critters: "text-coral-400",
+  crops: "text-orange-400",
+  artifacts: "text-amber-400",
+  gems: "text-purple-400",
+  forageables: "text-green-400",
+  cooking: "text-red-400",
+  "artisan-products": "text-amber-400",
+  npcs: "text-pink-400",
 };
 
-// Get icon for a search result
 function getResultIcon(item: SearchableItem): React.ReactNode {
   if (item.type === "altar" || item.type === "offering") {
-    return categoryIcons.temple;
+    const Temple = TEMPLE_ICON_COMPONENT;
+    return <Temple size={18} className="text-cyan-400" />;
   }
-  return categoryIcons[item.categorySlug] || <Search size={18} className="text-ocean-400" />;
-}
-
-// Highlight matching text in search results
-function HighlightMatch({ text, query }: { text: string; query: string }) {
-  if (!query.trim()) return <>{text}</>;
-
-  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
-
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.toLowerCase() === query.toLowerCase() ? (
-          <span key={i} className="text-palm-300 font-semibold">
-            {part}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
-    </>
-  );
+  const slug = item.categorySlug as keyof typeof CATEGORY_ICON_COMPONENTS;
+  const Icon = CATEGORY_ICON_COMPONENTS[slug];
+  if (Icon) return <Icon size={18} className={SEARCH_ICON_COLORS[slug] || "text-ocean-400"} />;
+  return <Search size={18} className="text-ocean-400" />;
 }
 
 /**

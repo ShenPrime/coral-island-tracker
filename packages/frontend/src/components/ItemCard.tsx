@@ -4,6 +4,7 @@ import type { Item, Season, ItemTempleStatus } from "@coral-tracker/shared";
 import { ItemImage } from "./ui";
 import { rarityColors, rarityCardStyles, seasonColors, anyBadgeStyle } from "../lib/styles";
 import { ARIA_LABELS } from "../lib/aria-labels";
+import { parseMetadata } from "../lib/parseMetadata";
 
 interface ItemCardProps {
   item: Item & { completed?: boolean; notes?: string | null };
@@ -30,8 +31,7 @@ export const ItemCard = memo(function ItemCard({
   // Animation state for completion
   const [justCompleted, setJustCompleted] = useState(false);
 
-  // Metadata should be pre-parsed from backend, just cast it
-  const itemMetadata = (item.metadata || {}) as Record<string, unknown>;
+  const itemMetadata = parseMetadata(item.metadata);
 
   const isOffering = 'altar' in itemMetadata;
   const requiredItems = itemMetadata.required_items as Array<{ name: string; quantity: number }> | undefined;

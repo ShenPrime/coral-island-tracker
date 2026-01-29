@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useId, useCallback, type RefObjec
 import { Search, X, ChevronDown, Check } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { ARIA_LABELS } from "@/lib/aria-labels";
+import { HighlightMatch } from "@/lib/highlightMatch";
 import { useKeyboardNavigation } from "@/context/KeyboardNavigationContext";
 import { useFilterNavigation } from "@/hooks/useFilterNavigation";
 import { 
@@ -134,19 +135,9 @@ function SearchAutocomplete({ items, value, onChange, onSelectItem, externalInpu
     }
   };
 
-  // Highlight matching text in suggestion
-  const highlightMatch = (text: string, query: string) => {
-    if (!query.trim()) return text;
-    const index = text.toLowerCase().indexOf(query.toLowerCase());
-    if (index === -1) return text;
-    return (
-      <>
-        {text.slice(0, index)}
-        <span className="text-ocean-300 font-semibold">{text.slice(index, index + query.length)}</span>
-        {text.slice(index + query.length)}
-      </>
-    );
-  };
+  const highlightMatch = (text: string, query: string) => (
+    <HighlightMatch text={text} query={query} className="text-ocean-300 font-semibold" />
+  );
 
   return (
     <div className="relative" ref={containerRef}>

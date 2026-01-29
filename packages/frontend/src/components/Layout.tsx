@@ -6,13 +6,7 @@ import { ARIA_LABELS } from "@/lib/aria-labels";
 import { SEASONS, type Season } from "@coral-tracker/shared";
 import {
   Fish,
-  Bug,
-  Carrot,
-  Gem,
   Scroll,
-  UtensilsCrossed,
-  Users,
-  Rabbit,
   Menu,
   X,
   Home,
@@ -25,6 +19,7 @@ import {
   ChevronsRight,
   Search,
 } from "lucide-react";
+import { CATEGORY_ICON_COMPONENTS } from "@/lib/icons";
 
 // Tooltip component for collapsed sidebar - uses portal to escape overflow:hidden
 interface TooltipProps {
@@ -98,17 +93,9 @@ function Tooltip({ children, content, enabled = true }: TooltipProps) {
   );
 }
 
-const categoryIcons: Record<string, React.ReactNode> = {
-  fish: <Fish size={20} />,
-  insects: <Bug size={20} />,
-  critters: <Rabbit size={20} />,
-  crops: <Carrot size={20} />,
-  artifacts: <Scroll size={20} />,
-  gems: <Gem size={20} />,
-  forageables: <Leaf size={20} />,
-  cooking: <UtensilsCrossed size={20} />,
-  npcs: <Users size={20} />,
-};
+const categoryIcons: Record<string, React.ReactNode> = Object.fromEntries(
+  Object.entries(CATEGORY_ICON_COMPONENTS).map(([slug, Icon]) => [slug, <Icon key={slug} size={20} />])
+);
 
 const seasonConfig: Record<Season, { label: string; icon: React.ReactNode; colors: string; activeColors: string }> = {
   spring: {

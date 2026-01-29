@@ -3,6 +3,7 @@ import type { Item, Season } from "@coral-tracker/shared";
 import { ItemImage, Modal, ModalBody, useModalContext } from "./ui";
 import { rarityColors, seasonColors, anyBadgeStyle, qualityTextColors } from "../lib/styles";
 import { ARIA_LABELS } from "../lib/aria-labels";
+import { parseMetadata } from "../lib/parseMetadata";
 
 interface ItemModalProps {
   item: Item & { completed?: boolean; notes?: string | null };
@@ -13,19 +14,7 @@ interface ItemModalProps {
 }
 
 export function ItemModal({ item, categorySlug, isOpen, onClose, onToggle }: ItemModalProps) {
-  // Parse metadata if it's a string (from JSON)
-  let metadata: Record<string, unknown> = {};
-  if (item.metadata) {
-    if (typeof item.metadata === 'string') {
-      try {
-        metadata = JSON.parse(item.metadata);
-      } catch {
-        metadata = {};
-      }
-    } else {
-      metadata = item.metadata as Record<string, unknown>;
-    }
-  }
+  const metadata = parseMetadata(item.metadata);
   
   const prices = metadata?.prices as Record<string, number> | undefined;
   const pricesWithPerk = metadata?.prices_with_perk as Record<string, number> | undefined;

@@ -3,29 +3,15 @@ import { useStore } from "@/store/useStore";
 import { ProgressBar } from "@/components/ProgressBar";
 import { PageLoader, NoSaveSlotWarning } from "@/components/ui";
 import { useSaveSlot } from "@/hooks/useQueries";
-import {
-  Fish,
-  Bug,
-  Carrot,
-  Gem,
-  Scroll,
-  UtensilsCrossed,
-  Users,
-  Rabbit,
-  Leaf,
-} from "lucide-react";
+import { Scroll } from "lucide-react";
+import { CATEGORY_ICON_COMPONENTS } from "@/lib/icons";
 
-const categoryIcons: Record<string, { sm: React.ReactNode; lg: React.ReactNode }> = {
-  fish: { sm: <Fish size={20} />, lg: <Fish size={24} /> },
-  insects: { sm: <Bug size={20} />, lg: <Bug size={24} /> },
-  critters: { sm: <Rabbit size={20} />, lg: <Rabbit size={24} /> },
-  crops: { sm: <Carrot size={20} />, lg: <Carrot size={24} /> },
-  artifacts: { sm: <Scroll size={20} />, lg: <Scroll size={24} /> },
-  gems: { sm: <Gem size={20} />, lg: <Gem size={24} /> },
-  forageables: { sm: <Leaf size={20} />, lg: <Leaf size={24} /> },
-  cooking: { sm: <UtensilsCrossed size={20} />, lg: <UtensilsCrossed size={24} /> },
-  npcs: { sm: <Users size={20} />, lg: <Users size={24} /> },
-};
+const categoryIcons: Record<string, { sm: React.ReactNode; lg: React.ReactNode }> = Object.fromEntries(
+  Object.entries(CATEGORY_ICON_COMPONENTS).map(([slug, Icon]) => [
+    slug,
+    { sm: <Icon key={`${slug}-sm`} size={20} />, lg: <Icon key={`${slug}-lg`} size={24} /> },
+  ])
+);
 
 export function Dashboard() {
   const { currentSaveId } = useStore();
