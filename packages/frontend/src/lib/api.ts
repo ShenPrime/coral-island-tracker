@@ -224,8 +224,7 @@ export async function getItemsTempleStatus(
 }
 
 // NPC Progress (protected - requires session)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getNPCs(saveId: number): Promise<any[]> {
+export async function getNPCs<T = Record<string, unknown>>(saveId: number): Promise<T[]> {
   return fetchApi(`/npcs/${saveId}`);
 }
 

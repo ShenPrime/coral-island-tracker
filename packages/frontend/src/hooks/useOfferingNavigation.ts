@@ -229,23 +229,35 @@ export function useOfferingNavigation({
   useEffect(() => {
     if (!enabled) return;
     
+    let modalOpen = false;
+
+    const observer = new MutationObserver(() => {
+      modalOpen = !!document.querySelector('[role="dialog"][aria-modal="true"]');
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // Initialize from current DOM state
+    modalOpen = !!document.querySelector('[role="dialog"][aria-modal="true"]');
+
     const handler = (e: KeyboardEvent) => {
       // Don't handle if typing in an input
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
       }
-      
-      // Don't handle if a modal is likely open (check for common patterns)
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) {
+
+      // Don't handle if a modal is open
+      if (modalOpen) {
         return;
       }
-      
+
       handleKeyDown(e);
     };
     
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      observer.disconnect();
+    };
   }, [enabled, handleKeyDown]);
 
   // Reset state when offerings change (e.g., navigating to different altar)

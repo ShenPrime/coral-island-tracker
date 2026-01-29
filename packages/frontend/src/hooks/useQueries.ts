@@ -141,7 +141,7 @@ export function useProgressItems(saveId: number | null, category: string | undef
 export function useNPCs(saveId: number | null) {
   return useQuery({
     queryKey: queryKeys.npcs(saveId!),
-    queryFn: () => getNPCs(saveId!),
+    queryFn: () => getNPCs<NPCData>(saveId!),
     enabled: !!saveId,
   });
 }

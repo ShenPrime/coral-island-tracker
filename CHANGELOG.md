@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.4 (2026-01-29)
+- **Fix**: Replaced per-keypress DOM query in offering navigation with MutationObserver-cached modal state
+- **Fix**: Typed `getNPCs` API return (removed `any[]` with generic type parameter)
+- **Fix**: Clamped items API `limit` (1–500) and `offset` (≥0) to prevent unbounded queries
+- **Fix**: Removed stale `useRef` import from global search hook
+
 ## v0.5.3 (2026-01-29)
 - **Performance**: Search in category view now scores and sorts items in a single pass instead of double-scoring with separate filter and sort
 - **Performance**: Search regex is precompiled once per query instead of recreated per item

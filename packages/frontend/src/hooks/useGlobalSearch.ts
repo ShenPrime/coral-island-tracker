@@ -189,14 +189,10 @@ export function useGlobalSearch() {
     [currentSaveId, queryClient]
   );
 
-  // Check if data is available (for loading state)
-  const hasData = useCallback(() => {
-    if (!currentSaveId) return false;
-    // Check if at least one category has data
-    return ITEM_CATEGORY_SLUGS.every(
-      (slug) => queryClient.getQueryData(queryKeys.progress(currentSaveId, slug)) != null
-    );
-  }, [currentSaveId, queryClient]);
+  // Check if all categories are cached (global search needs full data)
+  const isLoading = !currentSaveId || !ITEM_CATEGORY_SLUGS.every(
+    (slug) => queryClient.getQueryData(queryKeys.progress(currentSaveId, slug)) != null
+  );
 
-  return { search, isLoading: !hasData() };
+  return { search, isLoading };
 }

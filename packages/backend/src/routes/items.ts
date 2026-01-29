@@ -16,9 +16,10 @@ app.get("/", async (c) => {
     weather,
     rarity,
     search,
-    limit = 100,
-    offset = 0,
   } = query;
+
+  const limit = Math.max(1, Math.min(500, Number(query.limit) || 100));
+  const offset = Math.max(0, Number(query.offset) || 0);
 
   // Build dynamic query with conditions
   // Note: Empty arrays mean "any" (always available), so we use:
@@ -37,8 +38,8 @@ app.get("/", async (c) => {
       ${rarity ? sql`AND i.rarity = ${rarity}` : sql``}
       ${search ? sql`AND i.name ILIKE ${"%" + search + "%"}` : sql``}
       ORDER BY i.name ASC
-      LIMIT ${Number(limit)}
-      OFFSET ${Number(offset)}
+      LIMIT ${limit}
+      OFFSET ${offset}
     `;
   } else {
     items = await sql`
@@ -52,8 +53,8 @@ app.get("/", async (c) => {
       ${rarity ? sql`AND i.rarity = ${rarity}` : sql``}
       ${search ? sql`AND i.name ILIKE ${"%" + search + "%"}` : sql``}
       ORDER BY c.display_order ASC, i.name ASC
-      LIMIT ${Number(limit)}
-      OFFSET ${Number(offset)}
+      LIMIT ${limit}
+      OFFSET ${offset}
     `;
   }
 
@@ -73,8 +74,8 @@ app.get("/", async (c) => {
 
   return successResponse(c, withParsedMetadata(items), {
     total: countResult[0]?.total ?? 0,
-    limit: Number(limit),
-    offset: Number(offset),
+    limit,
+    offset,
   });
 });
 
