@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.5 (2026-01-30)
+
+- **Refactor**: Extract `SearchAutocomplete`, `MultiSelectDropdown`, and `SingleSelectDropdown` from `FilterBar.tsx` into dedicated component files (900 → 458 lines)
+
 ## v0.5.4 (2026-01-29)
 
 - **Fix**: Replaced per-keypress DOM query in offering navigation with MutationObserver-cached modal state
