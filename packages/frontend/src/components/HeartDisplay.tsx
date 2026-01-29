@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Heart } from "lucide-react";
 import { ARIA_LABELS } from "../lib/aria-labels";
 
@@ -22,6 +22,65 @@ const gapClasses = {
   md: "gap-1",
   lg: "gap-1.5",
 };
+
+function HeartButton({
+  index,
+  isFilled,
+  interactive,
+  size,
+  maxHearts,
+  onHeartClick,
+  hoveredHeart,
+  animatingHeart,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  index: number;
+  isFilled: boolean;
+  interactive: boolean;
+  size: "sm" | "md" | "lg";
+  maxHearts: number;
+  onHeartClick: (i: number) => void;
+  hoveredHeart: number | null;
+  animatingHeart: number | null;
+  onMouseEnter: (i: number | null) => void;
+  onMouseLeave: (i: null) => void;
+}) {
+  const isHovered = hoveredHeart !== null && index <= hoveredHeart;
+  const isAnimating = animatingHeart === index;
+
+  return (
+    <button
+      type="button"
+      disabled={!interactive}
+      onClick={() => onHeartClick(index)}
+      onMouseEnter={() => interactive && onMouseEnter(index)}
+      onMouseLeave={() => onMouseLeave(null)}
+      className={`
+        ${interactive ? "cursor-pointer" : "cursor-default"}
+        transition-transform duration-150
+        ${isAnimating ? "animate-heart-pop" : ""}
+        ${interactive && isHovered && !isFilled ? "scale-110" : ""}
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400 focus-visible:ring-offset-1 focus-visible:ring-offset-deepsea-800 rounded-sm
+      `}
+      aria-label={ARIA_LABELS.heartProgress(index + 1, maxHearts)}
+    >
+      <Heart
+        aria-hidden="true"
+        className={`
+          ${sizeClasses[size]}
+          transition-all duration-200
+          ${
+            isFilled || (interactive && isHovered)
+              ? "fill-coral-500 text-coral-500"
+              : "fill-transparent text-slate-500"
+          }
+          ${isFilled ? "drop-shadow-[0_0_4px_rgba(255,99,132,0.5)]" : ""}
+        `}
+      />
+    </button>
+  );
+}
 
 export function HeartDisplay({
   hearts,
@@ -52,63 +111,44 @@ export function HeartDisplay({
     [hearts, interactive, onHeartChange]
   );
 
-  const renderHearts = () => {
-    const heartElements = [];
-    
+  const heartElements = useMemo(() => {
+    const elements = [];
+
     // For display purposes, show hearts in rows of 5 if more than 10
     const heartsPerRow = maxHearts > 10 ? 5 : maxHearts;
-    
+
     for (let i = 0; i < maxHearts; i++) {
       const isFilled = i < hearts;
-      const isHovered = hoveredHeart !== null && i <= hoveredHeart;
-      const isAnimating = animatingHeart === i;
 
       // Add row break after 5 hearts if we have more than 10
       if (i > 0 && i % heartsPerRow === 0 && maxHearts > 10) {
-        heartElements.push(<div key={`break-${i}`} className="w-full h-0.5" />);
+        elements.push(<div key={`break-${i}`} className="w-full h-0.5" />);
       }
 
-      heartElements.push(
-        <button
+      elements.push(
+        <HeartButton
           key={i}
-          type="button"
-          disabled={!interactive}
-          onClick={() => handleHeartClick(i)}
-          onMouseEnter={() => interactive && setHoveredHeart(i)}
-          onMouseLeave={() => setHoveredHeart(null)}
-          className={`
-            ${interactive ? "cursor-pointer" : "cursor-default"}
-            transition-transform duration-150
-            ${isAnimating ? "animate-heart-pop" : ""}
-            ${interactive && isHovered && !isFilled ? "scale-110" : ""}
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-coral-400 focus-visible:ring-offset-1 focus-visible:ring-offset-deepsea-800 rounded-sm
-          `}
-          aria-label={ARIA_LABELS.heartProgress(i + 1, maxHearts)}
-        >
-          <Heart
-            aria-hidden="true"
-            className={`
-              ${sizeClasses[size]}
-              transition-all duration-200
-              ${
-                isFilled || (interactive && isHovered)
-                  ? "fill-coral-500 text-coral-500"
-                  : "fill-transparent text-slate-500"
-              }
-              ${isFilled ? "drop-shadow-[0_0_4px_rgba(255,99,132,0.5)]" : ""}
-            `}
-          />
-        </button>
+          index={i}
+          isFilled={isFilled}
+          interactive={interactive}
+          size={size}
+          maxHearts={maxHearts}
+          onHeartClick={handleHeartClick}
+          hoveredHeart={hoveredHeart}
+          animatingHeart={animatingHeart}
+          onMouseEnter={setHoveredHeart}
+          onMouseLeave={setHoveredHeart}
+        />
       );
     }
 
-    return heartElements;
-  };
+    return elements;
+  }, [hearts, maxHearts, interactive, size, handleHeartClick, hoveredHeart, animatingHeart]);
 
   return (
     <div className="flex flex-col gap-1">
       <div className={`flex flex-wrap items-center ${gapClasses[size]}`}>
-        {renderHearts()}
+        {heartElements}
       </div>
       {showCount && (
         <span className="text-xs text-slate-400 ml-0.5">

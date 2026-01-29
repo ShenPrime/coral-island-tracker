@@ -27,7 +27,7 @@ session.post("/", strictRateLimit, async (c) => {
     }, 201);
   } catch (error) {
     console.error("Failed to create session:", error);
-    return c.json({ error: "Failed to create session" }, 500);
+    return c.json({ error: "server_error", message: "Failed to create session", success: false }, 500);
   }
 });
 
@@ -40,14 +40,14 @@ session.get("/", async (c) => {
   const sessionId = c.req.header("X-Session-ID");
 
   if (!sessionId) {
-    return c.json({ error: "Missing X-Session-ID header" }, 401);
+    return c.json({ error: "unauthorized", message: "Missing X-Session-ID header", success: false }, 401);
   }
 
   try {
     const existingSession = await getSession(sessionId);
 
     if (!existingSession) {
-      return c.json({ error: "Invalid or expired session" }, 401);
+      return c.json({ error: "unauthorized", message: "Invalid or expired session", success: false }, 401);
     }
 
     return c.json({
@@ -58,7 +58,7 @@ session.get("/", async (c) => {
     });
   } catch (error) {
     console.error("Failed to validate session:", error);
-    return c.json({ error: "Failed to validate session" }, 500);
+    return c.json({ error: "server_error", message: "Failed to validate session", success: false }, 500);
   }
 });
 

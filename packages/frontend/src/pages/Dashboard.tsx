@@ -55,7 +55,7 @@ export function Dashboard() {
       <h2 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">
         Progress by Category
       </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {stats?.by_category.map((cat) => (
           <Link
             key={cat.category_slug}

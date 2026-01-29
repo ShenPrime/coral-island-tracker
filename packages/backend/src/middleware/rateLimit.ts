@@ -71,11 +71,12 @@ export const rateLimit = createMiddleware(async (c: Context, next: Next) => {
   if (entry.count > MAX_REQUESTS) {
     c.header("Retry-After", resetInSeconds.toString());
     return c.json(
-      { 
-        error: "Too many requests", 
+      {
+        error: "too_many_requests",
+        message: `Rate limit exceeded. Please wait ${resetInSeconds} seconds.`,
         retryAfter: resetInSeconds,
-        message: `Rate limit exceeded. Please wait ${resetInSeconds} seconds.`
-      }, 
+        success: false,
+      },
       429
     );
   }
@@ -119,11 +120,12 @@ export const strictRateLimit = createMiddleware(async (c: Context, next: Next) =
   if (entry.count > strictMax) {
     c.header("Retry-After", resetInSeconds.toString());
     return c.json(
-      { 
-        error: "Too many requests", 
+      {
+        error: "too_many_requests",
+        message: `Rate limit exceeded. Please wait ${resetInSeconds} seconds.`,
         retryAfter: resetInSeconds,
-        message: `Rate limit exceeded. Please wait ${resetInSeconds} seconds.`
-      }, 
+        success: false,
+      },
       429
     );
   }

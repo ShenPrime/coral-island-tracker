@@ -18,6 +18,11 @@ All notable changes to this project will be documented in this file.
 - **Backend**: Graceful shutdown on SIGTERM/SIGINT with connection pool drain
 - **Types**: Fix `Date` → `string` for all API response date fields (SaveSlot, Progress, TempleProgress, NPCProgress, TempleItemWithProgress)
 - **Types**: Add missing `"artisan-products"` to `CATEGORY_SLUGS`
+- **Fix**: `NewVersionBanner` useEffect dependency corrected from `[changelog]` to `[]`
+- **Perf**: Memoize `HeartDisplay` heart elements with `useMemo`
+- **Types**: Remove `| string` from `NPCResidence` to restore const array type safety
+- **Fix**: Redundant `sm:grid-cols-2` removed from Dashboard grid
+- **Backend**: Standardize error response format across session middleware, session routes, rate limiter, and temple routes
 
 ## v0.5.3 (2026-01-29)
 

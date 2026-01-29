@@ -31,26 +31,26 @@ export const requireSession = createMiddleware(async (c: Context, next: Next) =>
   const sessionId = c.req.header("X-Session-ID");
 
   if (!sessionId) {
-    return c.json({ error: "Missing X-Session-ID header" }, 401);
+    return c.json({ error: "unauthorized", message: "Missing X-Session-ID header", success: false }, 401);
   }
 
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(sessionId)) {
-    return c.json({ error: "Invalid session ID format" }, 401);
+    return c.json({ error: "unauthorized", message: "Invalid session ID format", success: false }, 401);
   }
 
   try {
     // Look up session and update last_seen_at
     const sessions = await sql`
-      UPDATE sessions 
-      SET last_seen_at = NOW() 
+      UPDATE sessions
+      SET last_seen_at = NOW()
       WHERE id = ${sessionId}
       RETURNING id, created_at, last_seen_at
     `;
 
     if (sessions.length === 0) {
-      return c.json({ error: "Invalid or expired session" }, 401);
+      return c.json({ error: "unauthorized", message: "Invalid or expired session", success: false }, 401);
     }
 
     // Attach session to context
@@ -59,7 +59,7 @@ export const requireSession = createMiddleware(async (c: Context, next: Next) =>
     await next();
   } catch (error) {
     console.error("Session validation error:", error);
-    return c.json({ error: "Session validation failed" }, 500);
+    return c.json({ error: "server_error", message: "Session validation failed", success: false }, 500);
   }
 });
 

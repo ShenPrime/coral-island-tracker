@@ -27,7 +27,7 @@ templeRouter.get("/altars", async (c) => {
   const saveId = c.req.query("saveId");
 
   if (!saveId) {
-    return c.json({ error: "bad_request", message: "saveId is required", success: false }, 400);
+    return errorResponse.badRequest(c, "saveId is required");
   }
 
   // Verify ownership

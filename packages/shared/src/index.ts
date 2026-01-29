@@ -487,7 +487,7 @@ export const NPC_RESIDENCES = [
   "Woodlands",
 ] as const;
 
-export type NPCResidence = (typeof NPC_RESIDENCES)[number] | string;
+export type NPCResidence = (typeof NPC_RESIDENCES)[number];
 
 // ============================================
 // Cooking Types

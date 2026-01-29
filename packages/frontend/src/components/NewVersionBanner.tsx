@@ -32,7 +32,7 @@ export function NewVersionBanner() {
       // Note: Flag is removed when user dismisses, not here
       // This handles React Strict Mode double-mounting
     }
-  }, [changelog]);
+  }, []);
 
   const handleRefresh = () => {
     localStorage.removeItem(PENDING_WHATS_NEW_KEY);
