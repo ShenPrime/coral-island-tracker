@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Refactor**: Extract shared `HighlightMatch` component to `lib/highlightMatch.tsx` (used by GlobalSearch and FilterBar)
 - **Refactor**: Extract shared `parseMetadata` utility to `lib/parseMetadata.ts` (used by TrackCategory, ItemModal, ItemCard)
 - **Refactor**: Extract shared icon component maps to `lib/icons.tsx` (used by Dashboard, Layout, GlobalSearch, AltarCard, AltarDetail)
+- **Fix**: Temple overview no longer shows negative offered counts — optimistic update now derives counts from altar detail cache instead of blind delta arithmetic
 
 ## v0.5.3 (2026-01-29)
 

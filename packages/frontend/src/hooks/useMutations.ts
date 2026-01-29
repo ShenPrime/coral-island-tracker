@@ -268,21 +268,6 @@ export function useUpdateTempleProgress() {
         queryKeys.templeOverview(saveId)
       );
 
-      queryClient.setQueryData<TempleOverview>(queryKeys.templeOverview(saveId), (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          offered_items: prev.offered_items + delta,
-          altars: altarSlug
-            ? prev.altars.map((a) =>
-                a.slug === altarSlug
-                  ? { ...a, offered_items: a.offered_items + delta }
-                  : a
-              )
-            : prev.altars,
-        };
-      });
-
       // Snapshot all altar detail caches
       const previousAltarData = queryClient.getQueriesData<AltarWithOfferings>({
         queryKey: ["altar", saveId],
@@ -315,6 +300,32 @@ export function useUpdateTempleProgress() {
           };
         }
       );
+
+      // Update temple overview by deriving counts from altar detail caches when available
+      queryClient.setQueryData<TempleOverview>(queryKeys.templeOverview(saveId), (prev) => {
+        if (!prev) return prev;
+        const updatedAltars = prev.altars.map((a) => {
+          const cached = queryClient.getQueryData<AltarWithOfferings>(
+            queryKeys.altarDetail(saveId, a.slug)
+          );
+          if (cached) {
+            return {
+              ...a,
+              offered_items: cached.offered_items,
+              completed_offerings: cached.completed_offerings,
+            };
+          }
+          return a.slug === altarSlug
+            ? { ...a, offered_items: Math.max(0, a.offered_items + delta) }
+            : a;
+        });
+        return {
+          ...prev,
+          altars: updatedAltars,
+          offered_items: updatedAltars.reduce((sum, a) => sum + a.offered_items, 0),
+          completed_offerings: updatedAltars.reduce((sum, a) => sum + a.completed_offerings, 0),
+        };
+      });
 
       // Snapshot and update temple-status caches (AltarDetail path)
       const previousTempleStatuses = altarSlug
