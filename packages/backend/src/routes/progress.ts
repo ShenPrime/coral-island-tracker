@@ -139,24 +139,25 @@ app.put("/:saveId/:itemId", async (c) => {
     return errorResponse.notFound(c, "Item");
   }
 
-  // Upsert progress
+  // Upsert progress + update save slot in a transaction
   const completedAt = body.completed ? new Date() : null;
   const notes = body.notes ?? null;
-  
-  const result = await sql`
-    INSERT INTO progress (save_slot_id, item_id, completed, completed_at, notes)
-    VALUES (${saveId}, ${itemId}, ${body.completed}, ${completedAt}, ${notes})
-    ON CONFLICT (save_slot_id, item_id) 
-    DO UPDATE SET 
-      completed = ${body.completed},
-      completed_at = ${completedAt},
-      notes = COALESCE(${notes}, progress.notes),
-      updated_at = NOW()
-    RETURNING *
-  `;
 
-  // Update save slot's updated_at
-  await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+  const result = await sql.begin(async (tx) => {
+    const rows = await tx`
+      INSERT INTO progress (save_slot_id, item_id, completed, completed_at, notes)
+      VALUES (${saveId}, ${itemId}, ${body.completed}, ${completedAt}, ${notes})
+      ON CONFLICT (save_slot_id, item_id)
+      DO UPDATE SET
+        completed = ${body.completed},
+        completed_at = ${completedAt},
+        notes = COALESCE(${notes}, progress.notes),
+        updated_at = NOW()
+      RETURNING *
+    `;
+    await tx`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+    return rows;
+  });
 
   return successResponse(c, result[0]);
 });
@@ -176,28 +177,29 @@ app.post("/:saveId/bulk", async (c) => {
     return errorResponse.notFound(c, "Save slot");
   }
 
-  // Perform bulk upsert
-  const results = [];
-  for (const update of body.updates) {
-    const completedAt = update.completed ? new Date() : null;
-    const notes = update.notes ?? null;
-    
-    const result = await sql`
-      INSERT INTO progress (save_slot_id, item_id, completed, completed_at, notes)
-      VALUES (${saveId}, ${update.item_id}, ${update.completed}, ${completedAt}, ${notes})
-      ON CONFLICT (save_slot_id, item_id) 
-      DO UPDATE SET 
-        completed = ${update.completed},
-        completed_at = ${completedAt},
-        notes = COALESCE(${notes}, progress.notes),
-        updated_at = NOW()
-      RETURNING *
-    `;
-    results.push(result[0]);
-  }
+  // Perform bulk upsert in a transaction
+  const results = await sql.begin(async (tx) => {
+    const rows = [];
+    for (const update of body.updates) {
+      const completedAt = update.completed ? new Date() : null;
+      const notes = update.notes ?? null;
 
-  // Update save slot's updated_at
-  await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+      const result = await tx`
+        INSERT INTO progress (save_slot_id, item_id, completed, completed_at, notes)
+        VALUES (${saveId}, ${update.item_id}, ${update.completed}, ${completedAt}, ${notes})
+        ON CONFLICT (save_slot_id, item_id)
+        DO UPDATE SET
+          completed = ${update.completed},
+          completed_at = ${completedAt},
+          notes = COALESCE(${notes}, progress.notes),
+          updated_at = NOW()
+        RETURNING *
+      `;
+      rows.push(result[0]);
+    }
+    await tx`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+    return rows;
+  });
 
   return successResponse(c, results);
 });

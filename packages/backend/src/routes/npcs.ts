@@ -211,28 +211,28 @@ app.put("/:saveId/:itemId", async (c) => {
   const notes = body.notes ?? null;
   const heartsValue = hearts ?? 0;
   
-  const result = await sql`
-    INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status, notes)
-    VALUES (
-      ${saveId}, 
-      ${itemId}, 
-      ${heartsValue}, 
-      ${newStatus}, 
-      ${notes}
-    )
-    ON CONFLICT (save_slot_id, item_id) 
-    DO UPDATE SET 
-      hearts = ${hearts !== undefined ? heartsValue : sql`npc_progress.hearts`},
-      relationship_status = ${newStatus},
-      notes = COALESCE(${notes}, npc_progress.notes),
-      updated_at = NOW()
-    RETURNING *
-  `;
+  const result = await sql.begin(async (tx) => {
+    const rows = await tx`
+      INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status, notes)
+      VALUES (
+        ${saveId},
+        ${itemId},
+        ${heartsValue},
+        ${newStatus},
+        ${notes}
+      )
+      ON CONFLICT (save_slot_id, item_id)
+      DO UPDATE SET
+        hearts = ${hearts !== undefined ? heartsValue : sql`npc_progress.hearts`},
+        relationship_status = ${newStatus},
+        notes = COALESCE(${notes}, npc_progress.notes),
+        updated_at = NOW()
+      RETURNING *
+    `;
+    await tx`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+    return rows;
+  });
 
-  // Update save slot's updated_at
-  await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
-
-  // Return updated progress with computed max_hearts
   const updatedMaxHearts = getMaxHearts(isMarriageCandidate, result[0]!.relationship_status as RelationshipStatus);
   
   return successResponse(c, {
@@ -281,17 +281,19 @@ app.post("/:saveId/:itemId/increment", async (c) => {
   // Don't exceed max hearts
   const newHearts = Math.min(currentHearts + 1, maxHearts);
 
-  const result = await sql`
-    INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status)
-    VALUES (${saveId}, ${itemId}, ${newHearts}, ${currentStatus})
-    ON CONFLICT (save_slot_id, item_id) 
-    DO UPDATE SET 
-      hearts = ${newHearts},
-      updated_at = NOW()
-    RETURNING *
-  `;
-
-  await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+  const result = await sql.begin(async (tx) => {
+    const rows = await tx`
+      INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status)
+      VALUES (${saveId}, ${itemId}, ${newHearts}, ${currentStatus})
+      ON CONFLICT (save_slot_id, item_id)
+      DO UPDATE SET
+        hearts = ${newHearts},
+        updated_at = NOW()
+      RETURNING *
+    `;
+    await tx`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+    return rows;
+  });
 
   return successResponse(c, {
     ...result[0],
@@ -339,17 +341,19 @@ app.post("/:saveId/:itemId/decrement", async (c) => {
   // Don't go below 0
   const newHearts = Math.max(currentHearts - 1, 0);
 
-  const result = await sql`
-    INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status)
-    VALUES (${saveId}, ${itemId}, ${newHearts}, ${currentStatus})
-    ON CONFLICT (save_slot_id, item_id) 
-    DO UPDATE SET 
-      hearts = ${newHearts},
-      updated_at = NOW()
-    RETURNING *
-  `;
-
-  await sql`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+  const result = await sql.begin(async (tx) => {
+    const rows = await tx`
+      INSERT INTO npc_progress (save_slot_id, item_id, hearts, relationship_status)
+      VALUES (${saveId}, ${itemId}, ${newHearts}, ${currentStatus})
+      ON CONFLICT (save_slot_id, item_id)
+      DO UPDATE SET
+        hearts = ${newHearts},
+        updated_at = NOW()
+      RETURNING *
+    `;
+    await tx`UPDATE save_slots SET updated_at = NOW() WHERE id = ${saveId}`;
+    return rows;
+  });
 
   return successResponse(c, {
     ...result[0],

@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "hono/bun";
-import { checkConnection } from "./db";
+import { checkConnection, closeConnection } from "./db";
 import categoriesRouter from "./routes/categories";
 import itemsRouter from "./routes/items";
 import savesRouter from "./routes/saves";
@@ -12,6 +12,7 @@ import templeRouter from "./routes/temple";
 import sessionRouter from "./routes/session";
 import npcsRouter from "./routes/npcs";
 import { rateLimit } from "./middleware/rateLimit";
+import { cleanupStaleSessions } from "./middleware/session";
 import path from "path";
 
 const app = new Hono();
@@ -105,6 +106,30 @@ app.onError((err, c) => {
 });
 
 const port = Number(process.env.PORT) || 3001;
+
+// Session cleanup: run once on startup, then every 24 hours
+const CLEANUP_INTERVAL = 30 * 24 * 60 * 60 * 1000;
+const cleanupTimer = setInterval(async () => {
+  try {
+    const deleted = await cleanupStaleSessions();
+    if (deleted > 0) console.log(`Session cleanup: removed ${deleted} stale sessions`);
+  } catch (e) {
+    console.error("Session cleanup failed:", e);
+  }
+}, CLEANUP_INTERVAL);
+
+// Run initial cleanup
+cleanupStaleSessions().catch(() => {});
+
+// Graceful shutdown
+function shutdown() {
+  console.log("\nShutting down...");
+  clearInterval(cleanupTimer);
+  closeConnection().then(() => process.exit(0)).catch(() => process.exit(1));
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 console.log(`
   Coral Island Tracker

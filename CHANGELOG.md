@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 - **Refactor**: Extract shared `parseMetadata` utility to `lib/parseMetadata.ts` (used by TrackCategory, ItemModal, ItemCard)
 - **Refactor**: Extract shared icon component maps to `lib/icons.tsx` (used by Dashboard, Layout, GlobalSearch, AltarCard, AltarDetail)
 - **Fix**: Temple overview no longer shows negative offered counts — optimistic update now derives counts from altar detail cache instead of blind delta arithmetic
+- **Backend**: Add missing database indexes for `items(slug)` and `temple_progress(temple_requirement_id)`
+- **Backend**: Wrap multi-statement progress mutations in transactions (progress, NPC, temple routes)
+- **Backend**: Add session cleanup — deletes sessions inactive for 6+ months, runs monthly
+- **Backend**: Graceful shutdown on SIGTERM/SIGINT with connection pool drain
 
 ## v0.5.3 (2026-01-29)
 
