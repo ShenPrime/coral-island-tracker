@@ -107,8 +107,8 @@ app.onError((err, c) => {
 
 const port = Number(process.env.PORT) || 3001;
 
-// Session cleanup: run once on startup, then every 24 hours
-const CLEANUP_INTERVAL = 30 * 24 * 60 * 60 * 1000;
+// Session cleanup: run once on startup, then every ~24.8 days (max 32-bit signed integer ms)
+const CLEANUP_INTERVAL = 2_147_483_647;
 const cleanupTimer = setInterval(async () => {
   try {
     const deleted = await cleanupStaleSessions();

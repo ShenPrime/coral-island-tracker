@@ -110,11 +110,20 @@ export async function createSession(): Promise<Session> {
  * Delete sessions not seen in the last 90 days
  */
 export async function cleanupStaleSessions(): Promise<number> {
-  const result = await sql`
-    DELETE FROM sessions
-    WHERE last_seen_at < NOW() - INTERVAL '6 months'
-  `;
-  return result.count;
+  try {
+    const result = await sql`
+      DELETE FROM sessions
+      WHERE last_seen_at < NOW() - INTERVAL '6 months'
+    `;
+    return result.count;
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+    const result = await sql`
+      DELETE FROM sessions
+      WHERE last_seen_at < NOW() - INTERVAL '6 months'
+    `;
+    return result.count;
+  }
 }
 
 /**

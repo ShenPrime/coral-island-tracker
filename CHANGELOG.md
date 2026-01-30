@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 - **Fix**: Replace redundant "Refresh" button in What's New banners with dismiss `X` button
 - **Feature**: Add "Full changelog" link to expandable What's New section
+- **Fix**: Session cleanup retry — `cleanupStaleSessions` now retries once after a 15s delay on connection errors (handles Railway proxy drops)
+- **Fix**: Session cleanup interval overflow — replaced 30-day `setInterval` (exceeds 32-bit signed int max) with `2_147_483_647` ms (~24.8 days)
 
 ## v0.5.5 (2026-01-30)
 
